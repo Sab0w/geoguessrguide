@@ -9,10 +9,8 @@
 :root{--bg:#1a1a1a;--card:#2d2d2d;--text:#fff;--accent:#4285F4;--meta:#2ecc71;--land:#e67e22;--del:#f55}
 *{box-sizing:border-box}
 body{background:var(--bg);font-family:'Segoe UI',sans-serif;color:var(--text);margin:0;padding:40px;overflow-x:hidden}
-.header{max-width:1200px;margin:0 auto 30px;display:flex;align-items:center;gap:20px}
-.back-btn{background:var(--card);color:#fff;padding:12px 20px;border:1px solid rgba(255,255,255,.1);border-radius:8px;text-decoration:none;font-weight:600;transition:all .3s}
-.back-btn:hover{background:var(--accent);border-color:var(--accent)}
-.title-wrapper{flex:1;display:flex;align-items:center;justify-content:center;gap:15px}
+.header{max-width:1200px;margin:0 auto 30px;display:flex;align-items:center;justify-content:center;gap:20px}
+.title-wrapper{display:flex;align-items:center;justify-content:center;gap:15px}
 h1{font-weight:300;margin:0}
 .action-bar{max-width:1200px;margin:0 auto 30px;display:flex;justify-content:space-between}
 .btn{padding:12px 24px;border:none;border-radius:6px;font-size:1rem;font-weight:bold;cursor:pointer;transition:all .3s}
@@ -53,10 +51,11 @@ textarea{resize:vertical;min-height:80px}
 .subcat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
 .subcat-name{font-size:1.2rem;font-weight:600;color:var(--accent)}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:15px;margin-top:15px}
-.photo{background:rgba(0,0,0,.3);border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.1);position:relative}
+.photo{background:rgba(0,0,0,.3);border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.1);position:relative;cursor:pointer;transition:transform .2s}
+.photo:hover{transform:scale(1.03)}
 .photo img{width:100%;height:120px;object-fit:cover}
 .photo-title{padding:10px;font-size:.85rem;color:#ccc}
-.photo-del{position:absolute;top:5px;right:5px;background:rgba(255,85,85,.9);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;opacity:0;transition:opacity .3s;font-size:14px;line-height:1}
+.photo-del{position:absolute;top:5px;right:5px;background:rgba(255,85,85,.9);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;opacity:0;transition:opacity .3s;font-size:14px;line-height:1;z-index:5}
 .photo:hover .photo-del{opacity:1}
 .add-photo{background:rgba(66,133,244,.1);border:2px dashed var(--accent);border-radius:8px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--accent);font-weight:600}
 .add-photo:hover{background:rgba(66,133,244,.2)}
@@ -99,12 +98,19 @@ textarea{resize:vertical;min-height:80px}
 .continent-item.active{background:rgba(66,133,244,.3);border-left:3px solid var(--accent);font-weight:600}
 .continent-emoji{font-size:1.5rem}
 .continent-name{flex:1}
+
+/* Lightbox styles */
+.lightbox{display:none;position:fixed;z-index:200;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.95);align-items:center;justify-content:center;cursor:zoom-out}
+.lightbox.show{display:flex}
+.lightbox img{max-width:90%;max-height:90%;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.lightbox-close{position:absolute;top:20px;right:30px;color:#fff;font-size:40px;font-weight:bold;cursor:pointer;transition:color .3s;z-index:201}
+.lightbox-close:hover{color:var(--accent)}
+.lightbox-title{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);color:#fff;font-size:1.2rem;text-align:center;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:8px;max-width:80%}
 </style>
 </head>
 <body>
 <div class="main-view" id="mainView">
 <div class="header">
-<a href="index.html" class="back-btn">← Retour</a>
 <div class="title-wrapper">
 <div class="continent-selector">
 <button class="continent-button" id="continentButton">
@@ -152,6 +158,13 @@ textarea{resize:vertical;min-height:80px}
 
 <div class="detail-view-page" id="detailViewPage">
 <div class="detail-container" id="detailPageContent"></div>
+</div>
+
+<!-- Lightbox pour agrandir les photos -->
+<div class="lightbox" id="lightbox">
+<span class="lightbox-close" id="lightboxClose">&times;</span>
+<img src="" alt="" id="lightboxImg">
+<div class="lightbox-title" id="lightboxTitle"></div>
 </div>
 
 <div id="countryModal" class="modal">
@@ -218,6 +231,36 @@ if(!window.supabase){setTimeout(init,100);return;}
 supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 loadCountries();
 setupEvents();
+setupLightbox();
+}
+
+function setupLightbox(){
+const lightbox=document.getElementById('lightbox');
+const lightboxClose=document.getElementById('lightboxClose');
+lightboxClose.onclick=closeLightbox;
+lightbox.onclick=function(e){
+if(e.target===lightbox)closeLightbox();
+};
+document.addEventListener('keydown',function(e){
+if(e.key==='Escape')closeLightbox();
+});
+}
+
+function openLightbox(url,title){
+const lightbox=document.getElementById('lightbox');
+const img=document.getElementById('lightboxImg');
+const titleEl=document.getElementById('lightboxTitle');
+img.src=url;
+titleEl.textContent=title||'';
+titleEl.style.display=title?'block':'none';
+lightbox.classList.add('show');
+document.body.style.overflow='hidden';
+}
+
+function closeLightbox(){
+const lightbox=document.getElementById('lightbox');
+lightbox.classList.remove('show');
+document.body.style.overflow='';
 }
 
 function setupEvents(){
@@ -369,7 +412,7 @@ h+=`<div class="subcat-section">
 if(s.photos&&s.photos.length){
 h+=`<div class="gallery">`;
 s.photos.forEach((p,j)=>{
-h+=`<div class="photo">
+h+=`<div class="photo" data-url="${p.url}" data-title="${p.title||''}">
 <button class="photo-del del-photo-btn" data-subcat="${i}" data-photo="${j}">×</button>
 <img src="${p.url}" alt="${p.title||'Photo'}">
 <div class="photo-title">${p.title||''}</div>
@@ -401,7 +444,19 @@ document.querySelectorAll('.del-subcat-btn').forEach(btn=>{
 btn.onclick=()=>deleteSubcat(parseInt(btn.dataset.index));
 });
 document.querySelectorAll('.del-photo-btn').forEach(btn=>{
-btn.onclick=()=>deletePhoto(parseInt(btn.dataset.subcat),parseInt(btn.dataset.photo));
+btn.onclick=function(e){
+e.stopPropagation();
+deletePhoto(parseInt(btn.dataset.subcat),parseInt(btn.dataset.photo));
+};
+});
+// Ajouter les événements pour agrandir les photos
+document.querySelectorAll('.photo').forEach(photo=>{
+photo.onclick=function(e){
+if(e.target.classList.contains('photo-del'))return;
+const url=this.dataset.url;
+const title=this.dataset.title;
+openLightbox(url,title);
+};
 });
 document.getElementById('mainView').classList.add('hidden');
 page.classList.add('active');
