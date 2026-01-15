@@ -86,13 +86,62 @@ textarea{resize:vertical;min-height:80px}
 .section-title{color:var(--accent);font-size:1.5rem;margin:40px 0 20px;font-weight:600}
 .edit-inline-btn{background:rgba(66,133,244,.2);color:var(--accent);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s}
 .edit-inline-btn:hover{background:var(--accent);color:#fff}
+.continent-selector{position:relative;display:inline-block}
+.continent-button{background:var(--card);color:#fff;padding:12px 24px;border:1px solid rgba(255,255,255,.2);border-radius:8px;font-size:1.5rem;font-weight:300;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .3s}
+.continent-button:hover{background:rgba(66,133,244,.2);border-color:var(--accent)}
+.continent-button::after{content:'▼';font-size:.8rem;transition:transform .3s}
+.continent-button.open::after{transform:rotate(180deg)}
+.continent-dropdown{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid rgba(255,255,255,.2);border-radius:8px;min-width:250px;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:all .3s;z-index:1000;max-height:400px;overflow-y:auto}
+.continent-dropdown.show{opacity:1;visibility:visible}
+.continent-item{padding:12px 20px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.05)}
+.continent-item:last-child{border-bottom:none}
+.continent-item:hover{background:rgba(66,133,244,.2);padding-left:25px}
+.continent-item.active{background:rgba(66,133,244,.3);border-left:3px solid var(--accent);font-weight:600}
+.continent-emoji{font-size:1.5rem}
+.continent-name{flex:1}
 </style>
 </head>
 <body>
 <div class="main-view" id="mainView">
 <div class="header">
 <a href="index.html" class="back-btn">← Retour</a>
-<div class="title-wrapper"><h1>Europe</h1></div>
+<div class="title-wrapper">
+<div class="continent-selector">
+<button class="continent-button" id="continentButton">
+<span id="currentContinentName">Europe</span>
+</button>
+<div class="continent-dropdown" id="continentDropdown">
+<div class="continent-item" data-continent="europe">
+<span class="continent-emoji">🇪🇺</span>
+<span class="continent-name">Europe</span>
+</div>
+<div class="continent-item" data-continent="asia">
+<span class="continent-emoji">🌏</span>
+<span class="continent-name">Asie</span>
+</div>
+<div class="continent-item" data-continent="africa">
+<span class="continent-emoji">🌍</span>
+<span class="continent-name">Afrique</span>
+</div>
+<div class="continent-item" data-continent="north-america">
+<span class="continent-emoji">🌎</span>
+<span class="continent-name">Amérique du Nord</span>
+</div>
+<div class="continent-item" data-continent="south-america">
+<span class="continent-emoji">🌎</span>
+<span class="continent-name">Amérique du Sud</span>
+</div>
+<div class="continent-item" data-continent="oceania">
+<span class="continent-emoji">🌏</span>
+<span class="continent-name">Océanie</span>
+</div>
+<div class="continent-item" data-continent="antarctica">
+<span class="continent-emoji">🇦🇶</span>
+<span class="continent-name">Antarctique</span>
+</div>
+</div>
+</div>
+</div>
 </div>
 <div class="action-bar">
 <button class="btn btn-secondary" id="refreshBtn">🔄 Actualiser</button>
@@ -151,8 +200,18 @@ textarea{resize:vertical;min-height:80px}
 (function(){
 const SUPABASE_URL='https://iawoksstpmtppadktnmi.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhd29rc3N0cG10cHBhZGt0bm1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzUwOTAsImV4cCI6MjA4NDAxMTA5MH0.vl2Grce9qtU97lDKILYJughIfFpzY1TV-ELdmJkDaKg';
-const CONTINENT='europe';
+let CONTINENT='europe';
 let supabase,sections=[],currentCountry=null,editSubcatIdx=null,photos=[];
+
+const continentNames={
+'europe':'Europe',
+'asia':'Asie',
+'africa':'Afrique',
+'north-america':'Amérique du Nord',
+'south-america':'Amérique du Sud',
+'oceania':'Océanie',
+'antarctica':'Antarctique'
+};
 
 function init(){
 if(!window.supabase){setTimeout(init,100);return;}
@@ -170,6 +229,34 @@ document.getElementById('addSectionBtn').onclick=addSection;
 document.getElementById('closeSubcatBtn').onclick=closeSubcatModal;
 document.getElementById('saveSubcatBtn').onclick=saveSubcat;
 document.getElementById('addPhotoBtn').onclick=addPhoto;
+
+const continentBtn=document.getElementById('continentButton');
+const dropdown=document.getElementById('continentDropdown');
+continentBtn.onclick=function(e){
+e.stopPropagation();
+continentBtn.classList.toggle('open');
+dropdown.classList.toggle('show');
+};
+
+document.addEventListener('click',function(e){
+if(!e.target.closest('.continent-selector')){
+continentBtn.classList.remove('open');
+dropdown.classList.remove('show');
+}
+});
+
+document.querySelectorAll('.continent-item').forEach(item=>{
+item.onclick=function(){
+const newContinent=this.dataset.continent;
+if(newContinent!==CONTINENT){
+switchContinent(newContinent);
+}
+continentBtn.classList.remove('open');
+dropdown.classList.remove('show');
+};
+});
+
+updateContinentUI();
 }
 
 async function loadCountries(){
@@ -183,6 +270,26 @@ renderCountries(data||[]);
 console.error(e);
 g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:#888">❌ Erreur de chargement</div>';
 }
+}
+
+function switchContinent(continent){
+CONTINENT=continent;
+updateContinentUI();
+if(document.getElementById('detailViewPage').classList.contains('active')){
+closeDetailPage();
+}
+loadCountries();
+}
+
+function updateContinentUI(){
+document.getElementById('currentContinentName').textContent=continentNames[CONTINENT]||CONTINENT;
+document.querySelectorAll('.continent-item').forEach(item=>{
+if(item.dataset.continent===CONTINENT){
+item.classList.add('active');
+}else{
+item.classList.remove('active');
+}
+});
 }
 
 function renderCountries(cs){
