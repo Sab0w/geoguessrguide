@@ -369,11 +369,22 @@
   </div>
 
 <script>
+(function() {
   const SUPABASE_URL = 'https://iawoksstpmtppadktnmi.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhd29rc3N0cG10cHBhZGt0bm1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzUwOTAsImV4cCI6MjA4NDAxMTA5MH0.vl2Grce9qtU97lDKILYJughIfFpzY1TV-ELdmJkDaKg';
   const CONTINENT = 'europe';
   
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let supabase;
+  
+  // Attendre que Supabase soit chargé
+  function initSupabase() {
+    if (typeof window.supabase === 'undefined') {
+      setTimeout(initSupabase, 100);
+      return;
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    loadCountries();
+  }
 
   async function loadCountries() {
     const grid = document.getElementById('grid');
@@ -404,21 +415,21 @@
       return;
     }
     
-    countries.forEach(country => {
+    countries.forEach(function(country) {
       const card = document.createElement('div');
       card.className = 'country-card';
       
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'delete-btn';
       deleteBtn.textContent = '×';
-      deleteBtn.onclick = (e) => {
+      deleteBtn.onclick = function(e) {
         e.stopPropagation();
         deleteCountry(country.id, country.name);
       };
       
       const flagDiv = document.createElement('div');
       flagDiv.className = 'flag-header';
-      flagDiv.style.backgroundImage = `url('${country.flag || 'https://via.placeholder.com/300x150'}')`;
+      flagDiv.style.backgroundImage = 'url(\'' + (country.flag || 'https://via.placeholder.com/300x150') + '\')';
       
       const nameDiv = document.createElement('div');
       nameDiv.className = 'country-name';
@@ -428,20 +439,11 @@
       const contentDiv = document.createElement('div');
       contentDiv.className = 'card-content';
       
-      contentDiv.innerHTML = `
-        <div class="hint-row">
-          <span class="tag meta">Méta</span>
-          <span>${country.meta || '-'}</span>
-        </div>
-        <div class="hint-row">
-          <span class="tag landscape">Paysage</span>
-          <span>${country.land || '-'}</span>
-        </div>
-      `;
+      contentDiv.innerHTML = '<div class="hint-row"><span class="tag meta">Méta</span><span>' + (country.meta || '-') + '</span></div><div class="hint-row"><span class="tag landscape">Paysage</span><span>' + (country.land || '-') + '</span></div>';
       
       if (country.link && country.link !== '#') {
-        contentDiv.onclick = () => window.open(country.link, '_blank');
-        flagDiv.onclick = () => window.open(country.link, '_blank');
+        contentDiv.onclick = function() { window.open(country.link, '_blank'); };
+        flagDiv.onclick = function() { window.open(country.link, '_blank'); };
       }
       
       card.appendChild(deleteBtn);
@@ -452,7 +454,7 @@
   }
 
   async function deleteCountry(id, name) {
-    if (!confirm(`Supprimer "${name}" ?\n\nCe pays sera supprimé pour tous les utilisateurs.`)) {
+    if (!confirm('Supprimer "' + name + '" ?\n\nCe pays sera supprimé pour tous les utilisateurs.')) {
       return;
     }
     
@@ -475,23 +477,25 @@
     }
   }
 
-  document.getElementById('addBtn').onclick = () => {
+  document.getElementById('addBtn').onclick = function() {
     document.getElementById('myModal').className = 'modal show';
   };
 
-  document.getElementById('closeBtn').onclick = () => {
+  document.getElementById('closeBtn').onclick = function() {
     document.getElementById('myModal').className = 'modal';
   };
 
-  document.getElementById('myModal').onclick = (e) => {
+  document.getElementById('myModal').onclick = function(e) {
     if (e.target.id === 'myModal') {
       document.getElementById('myModal').className = 'modal';
     }
   };
 
-  document.getElementById('refreshBtn').onclick = loadCountries;
+  document.getElementById('refreshBtn').onclick = function() {
+    loadCountries();
+  };
 
-  document.getElementById('saveBtn').onclick = async () => {
+  document.getElementById('saveBtn').onclick = async function() {
     const name = document.getElementById('inputName').value.trim();
     
     if (!name) {
@@ -534,7 +538,8 @@
     }
   };
 
-  loadCountries();
+  initSupabase();
+})();
 </script>
 
 </body>
