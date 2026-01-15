@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GeoGuessr - Europe (Partagé)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg-color: #1a1a1a;
@@ -310,8 +311,8 @@
   .info-banner {
     max-width: 1200px;
     margin: 0 auto 20px;
-    background: rgba(66, 133, 244, 0.2);
-    border: 1px solid #4285F4;
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
     padding: 15px;
     border-radius: 8px;
     text-align: center;
@@ -333,7 +334,7 @@
   </div>
 
   <div class="info-banner">
-    ✅ Base de données partagée : Tous les utilisateurs voient les mêmes pays en temps réel !
+    ✅ Base de données partagée avec Supabase : Tous les changements sont instantanés pour tous les utilisateurs !
   </div>
 
   <div class="action-bar">
@@ -368,210 +369,172 @@
   </div>
 
 <script>
-(function() {
-  var API_URL = 'https://script.google.com/macros/s/AKfycbyMLT7Q8wJqIjZNh7f4lVNbUWdBqFruUMsU7R1Df_eFWJbExmXCsMIVWgP9fjmFRWQ/exec';
-  var CONTINENT = 'europe';
-  var countries = [];
+  const SUPABASE_URL = 'https://iawoksstpmtppadktnmi.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhd29rc3N0cG10cHBhZGt0bm1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzUwOTAsImV4cCI6MjA4NDAxMTA5MH0.vl2Grce9qtU97lDKILYJughIfFpzY1TV-ELdmJkDaKg';
+  const CONTINENT = 'europe';
+  
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  function loadFromAPI() {
-    var grid = document.getElementById("grid");
+  async function loadCountries() {
+    const grid = document.getElementById('grid');
     grid.innerHTML = '<div class="loading-message">⏳ Chargement des données...</div>';
     
-    fetch(API_URL + '?t=' + Date.now())
-      .then(function(response) { return response.json(); })
-      .then(function(data) {
-        countries = data.filter(function(c) { return c.continent === CONTINENT; });
-        render();
-      })
-      .catch(function(error) {
-        console.error('Erreur:', error);
-        grid.innerHTML = '<div class="empty-message">❌ Erreur de chargement. Cliquez sur "Actualiser".</div>';
-      });
+    try {
+      const { data, error } = await supabase
+        .from('countries')
+        .select('*')
+        .eq('continent', CONTINENT)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      renderCountries(data || []);
+    } catch (error) {
+      console.error('Erreur:', error);
+      grid.innerHTML = '<div class="empty-message">❌ Erreur de chargement. Cliquez sur "Actualiser".</div>';
+    }
   }
 
-  function render() {
-    var grid = document.getElementById("grid");
-    grid.innerHTML = "";
+  function renderCountries(countries) {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
     
     if (countries.length === 0) {
       grid.innerHTML = '<div class="empty-message">Aucun pays ajouté. Cliquez sur "➕ Ajouter un pays" !</div>';
       return;
     }
     
-    for (var i = 0; i < countries.length; i++) {
-      var c = countries[i];
+    countries.forEach(country => {
+      const card = document.createElement('div');
+      card.className = 'country-card';
       
-      var card = document.createElement("div");
-      card.className = "country-card";
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteCountry(country.id, country.name);
+      };
       
-      var deleteBtn = document.createElement("button");
-      deleteBtn.className = "delete-btn";
-      deleteBtn.textContent = "×";
-      deleteBtn.setAttribute("data-name", c.name);
-      deleteBtn.setAttribute("data-timestamp", c.timestamp);
+      const flagDiv = document.createElement('div');
+      flagDiv.className = 'flag-header';
+      flagDiv.style.backgroundImage = `url('${country.flag || 'https://via.placeholder.com/300x150'}')`;
       
-      var flagDiv = document.createElement("div");
-      flagDiv.className = "flag-header";
-      flagDiv.style.backgroundImage = "url('" + (c.flag || "https://via.placeholder.com/300x150") + "')";
-      
-      var nameDiv = document.createElement("div");
-      nameDiv.className = "country-name";
-      nameDiv.textContent = c.name;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'country-name';
+      nameDiv.textContent = country.name;
       flagDiv.appendChild(nameDiv);
       
-      var contentDiv = document.createElement("div");
-      contentDiv.className = "card-content";
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'card-content';
       
-      var metaRow = document.createElement("div");
-      metaRow.className = "hint-row";
-      metaRow.innerHTML = '<span class="tag meta">Méta</span><span>' + (c.meta || "-") + '</span>';
+      contentDiv.innerHTML = `
+        <div class="hint-row">
+          <span class="tag meta">Méta</span>
+          <span>${country.meta || '-'}</span>
+        </div>
+        <div class="hint-row">
+          <span class="tag landscape">Paysage</span>
+          <span>${country.land || '-'}</span>
+        </div>
+      `;
       
-      var landRow = document.createElement("div");
-      landRow.className = "hint-row";
-      landRow.innerHTML = '<span class="tag landscape">Paysage</span><span>' + (c.land || "-") + '</span>';
-      
-      contentDiv.appendChild(metaRow);
-      contentDiv.appendChild(landRow);
+      if (country.link && country.link !== '#') {
+        contentDiv.onclick = () => window.open(country.link, '_blank');
+        flagDiv.onclick = () => window.open(country.link, '_blank');
+      }
       
       card.appendChild(deleteBtn);
       card.appendChild(flagDiv);
       card.appendChild(contentDiv);
-      
-      (function(link) {
-        contentDiv.onclick = function() {
-          if (link && link !== "#" && link !== "") {
-            window.open(link, "_blank");
-          }
-        };
-        flagDiv.onclick = function() {
-          if (link && link !== "#" && link !== "") {
-            window.open(link, "_blank");
-          }
-        };
-      })(c.link);
-      
       grid.appendChild(card);
-    }
-    
-    var deleteBtns = document.querySelectorAll(".delete-btn");
-    for (var j = 0; j < deleteBtns.length; j++) {
-      deleteBtns[j].onclick = function(e) {
-        e.stopPropagation();
-        var name = this.getAttribute("data-name");
-        var timestamp = this.getAttribute("data-timestamp");
-        deleteCountry(name, timestamp);
-      };
-    }
+    });
   }
 
-  function deleteCountry(name, timestamp) {
-    if (!confirm("Supprimer \"" + name + "\" ?\n\nCe pays sera supprimé pour tous les utilisateurs.")) {
+  async function deleteCountry(id, name) {
+    if (!confirm(`Supprimer "${name}" ?\n\nCe pays sera supprimé pour tous les utilisateurs.`)) {
       return;
     }
     
-    var grid = document.getElementById("grid");
+    const grid = document.getElementById('grid');
     grid.innerHTML = '<div class="loading-message">⏳ Suppression en cours...</div>';
     
-    fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'delete',
-        continent: CONTINENT,
-        name: name,
-        timestamp: timestamp
-      })
-    })
-    .then(function(response) { return response.json(); })
-    .then(function(result) {
-      if (result.success) {
-        loadFromAPI();
-      } else {
-        alert("Erreur : " + result.message);
-        render();
-      }
-    })
-    .catch(function(error) {
+    try {
+      const { error } = await supabase
+        .from('countries')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      await loadCountries();
+    } catch (error) {
       console.error('Erreur:', error);
-      alert("Erreur de suppression");
-      render();
-    });
+      alert('Erreur lors de la suppression');
+      await loadCountries();
+    }
   }
 
-  document.getElementById("addBtn").onclick = function() {
-    document.getElementById("myModal").className = "modal show";
+  document.getElementById('addBtn').onclick = () => {
+    document.getElementById('myModal').className = 'modal show';
   };
 
-  document.getElementById("closeBtn").onclick = function() {
-    document.getElementById("myModal").className = "modal";
+  document.getElementById('closeBtn').onclick = () => {
+    document.getElementById('myModal').className = 'modal';
   };
 
-  document.getElementById("myModal").onclick = function(e) {
-    if (e.target === this) {
-      this.className = "modal";
+  document.getElementById('myModal').onclick = (e) => {
+    if (e.target.id === 'myModal') {
+      document.getElementById('myModal').className = 'modal';
     }
   };
 
-  document.getElementById("refreshBtn").onclick = function() {
-    loadFromAPI();
-  };
+  document.getElementById('refreshBtn').onclick = loadCountries;
 
-  document.getElementById("saveBtn").onclick = function() {
-    var name = document.getElementById("inputName").value.trim();
+  document.getElementById('saveBtn').onclick = async () => {
+    const name = document.getElementById('inputName').value.trim();
     
     if (!name) {
-      alert("Le nom est obligatoire !");
+      alert('Le nom est obligatoire !');
       return;
     }
     
-    var flag = document.getElementById("inputFlag").value.trim();
-    var meta = document.getElementById("inputMeta").value.trim();
-    var land = document.getElementById("inputLandscape").value.trim();
-    var link = document.getElementById("inputLink").value.trim();
-    
-    var saveBtn = document.getElementById("saveBtn");
+    const saveBtn = document.getElementById('saveBtn');
     saveBtn.disabled = true;
-    saveBtn.textContent = "Ajout en cours...";
+    saveBtn.textContent = 'Ajout en cours...';
     
-    fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'add',
-        continent: CONTINENT,
-        name: name,
-        flag: flag,
-        meta: meta,
-        land: land,
-        link: link
-      })
-    })
-    .then(function(response) { return response.json(); })
-    .then(function(result) {
-      if (result.success) {
-        document.getElementById("myModal").className = "modal";
-        document.getElementById("inputName").value = "";
-        document.getElementById("inputFlag").value = "";
-        document.getElementById("inputMeta").value = "";
-        document.getElementById("inputLandscape").value = "";
-        document.getElementById("inputLink").value = "";
-        loadFromAPI();
-      } else {
-        alert("Erreur : " + result.message);
-      }
-      saveBtn.disabled = false;
-      saveBtn.textContent = "Sauvegarder";
-    })
-    .catch(function(error) {
+    try {
+      const { error } = await supabase
+        .from('countries')
+        .insert([{
+          continent: CONTINENT,
+          name: name,
+          flag: document.getElementById('inputFlag').value.trim(),
+          meta: document.getElementById('inputMeta').value.trim(),
+          land: document.getElementById('inputLandscape').value.trim(),
+          link: document.getElementById('inputLink').value.trim()
+        }]);
+      
+      if (error) throw error;
+      
+      document.getElementById('myModal').className = 'modal';
+      document.getElementById('inputName').value = '';
+      document.getElementById('inputFlag').value = '';
+      document.getElementById('inputMeta').value = '';
+      document.getElementById('inputLandscape').value = '';
+      document.getElementById('inputLink').value = '';
+      
+      await loadCountries();
+    } catch (error) {
       console.error('Erreur:', error);
-      alert("Erreur lors de l'ajout");
+      alert('Erreur lors de l\'ajout');
+    } finally {
       saveBtn.disabled = false;
-      saveBtn.textContent = "Sauvegarder";
-    });
+      saveBtn.textContent = 'Sauvegarder';
+    }
   };
 
-  loadFromAPI();
-})();
+  loadCountries();
 </script>
 
 </body>
