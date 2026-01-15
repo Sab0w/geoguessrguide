@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoGuessr - Europe</title>
+<title>GeoGuessr - Europe (Partagé)</title>
 <style>
   :root {
     --bg-color: #1a1a1a;
@@ -84,7 +84,24 @@
     max-width: 1200px;
     margin: 0 auto 30px auto;
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .refresh-btn {
+    background-color: #6b7280;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .refresh-btn:hover {
+    background-color: #4b5563;
   }
 
   .btn-add {
@@ -101,6 +118,11 @@
 
   .btn-add:hover {
     background-color: #3367d6;
+  }
+
+  .btn-add:disabled, .refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .grid-container {
@@ -199,7 +221,7 @@
   .tag.meta { background: rgba(46, 204, 113, 0.2); color: var(--meta-color); border: 1px solid var(--meta-color); }
   .tag.landscape { background: rgba(230, 126, 34, 0.2); color: var(--landscape-color); border: 1px solid var(--landscape-color); }
 
-  .empty-message {
+  .empty-message, .loading-message {
     text-align: center;
     padding: 60px 20px;
     color: #888;
@@ -279,6 +301,22 @@
   button.save-btn:hover { 
     background-color: #3367d6; 
   }
+
+  button.save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .info-banner {
+    max-width: 1200px;
+    margin: 0 auto 20px;
+    background: rgba(66, 133, 244, 0.2);
+    border: 1px solid #4285F4;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.9rem;
+  }
 </style>
 </head>
 <body>
@@ -287,14 +325,19 @@
     <a href="index.html" class="back-btn">← Retour</a>
     <div class="title-wrapper">
       <div class="continent-logo">
-        <img src="https://raw.githubusercontent.com/Sab0w/geoguessrguide/main/flag-eu.png" alt="Union Européenne">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/320px-Flag_of_Europe.svg.png" alt="Union Européenne">
       </div>
       <h1>Europe</h1>
     </div>
     <div style="width: 120px;"></div>
   </div>
 
+  <div class="info-banner">
+    ✅ Base de données partagée : Tous les utilisateurs voient les mêmes pays en temps réel !
+  </div>
+
   <div class="action-bar">
+    <button class="refresh-btn" id="refreshBtn">🔄 Actualiser</button>
     <button class="btn-add" id="addBtn">➕ Ajouter un pays</button>
   </div>
 
@@ -326,37 +369,24 @@
 
 <script>
 (function() {
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxpmN0r6nc-uK-X04KYrzqtkBR5eqRZoXOhOu9fWKnXceMcx80nv0iuHj58i1wGcelN/exec';
+  var CONTINENT = 'europe';
   var countries = [];
-  var cookieName = 'geoguessr_europe';
 
-  function saveToCookie() {
-    try {
-      var data = JSON.stringify(countries);
-      var expires = new Date();
-      expires.setFullYear(expires.getFullYear() + 1);
-      document.cookie = cookieName + "=" + encodeURIComponent(data) + "; expires=" + expires.toUTCString() + "; path=/";
-      return true;
-    } catch(e) {
-      console.error("Erreur sauvegarde:", e);
-      return false;
-    }
-  }
-
-  function loadFromCookie() {
-    try {
-      var cookies = document.cookie.split(';');
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        if (cookie.indexOf(cookieName + "=") === 0) {
-          var data = decodeURIComponent(cookie.substring(cookieName.length + 1));
-          countries = JSON.parse(data);
-          return true;
-        }
-      }
-    } catch(e) {
-      console.error("Erreur chargement:", e);
-    }
-    return false;
+  function loadFromAPI() {
+    var grid = document.getElementById("grid");
+    grid.innerHTML = '<div class="loading-message">⏳ Chargement des données...</div>';
+    
+    fetch(API_URL + '?t=' + Date.now())
+      .then(function(response) { return response.json(); })
+      .then(function(data) {
+        countries = data.filter(function(c) { return c.continent === CONTINENT; });
+        render();
+      })
+      .catch(function(error) {
+        console.error('Erreur:', error);
+        grid.innerHTML = '<div class="empty-message">❌ Erreur de chargement. Cliquez sur "Actualiser".</div>';
+      });
   }
 
   function render() {
@@ -373,13 +403,12 @@
       
       var card = document.createElement("div");
       card.className = "country-card";
-      card.setAttribute("data-index", i);
       
-      // Bouton supprimer
       var deleteBtn = document.createElement("button");
       deleteBtn.className = "delete-btn";
       deleteBtn.textContent = "×";
-      deleteBtn.setAttribute("data-index", i);
+      deleteBtn.setAttribute("data-name", c.name);
+      deleteBtn.setAttribute("data-timestamp", c.timestamp);
       
       var flagDiv = document.createElement("div");
       flagDiv.className = "flag-header";
@@ -408,15 +437,14 @@
       card.appendChild(flagDiv);
       card.appendChild(contentDiv);
       
-      // Event pour ouvrir le lien
       (function(link) {
         contentDiv.onclick = function() {
-          if (link && link !== "#") {
+          if (link && link !== "#" && link !== "") {
             window.open(link, "_blank");
           }
         };
         flagDiv.onclick = function() {
-          if (link && link !== "#") {
+          if (link && link !== "#" && link !== "") {
             window.open(link, "_blank");
           }
         };
@@ -425,29 +453,49 @@
       grid.appendChild(card);
     }
     
-    // Ajouter les événements de suppression après le rendu
     var deleteBtns = document.querySelectorAll(".delete-btn");
     for (var j = 0; j < deleteBtns.length; j++) {
       deleteBtns[j].onclick = function(e) {
         e.stopPropagation();
-        var idx = parseInt(this.getAttribute("data-index"));
-        deleteCountry(idx);
+        var name = this.getAttribute("data-name");
+        var timestamp = this.getAttribute("data-timestamp");
+        deleteCountry(name, timestamp);
       };
     }
   }
 
-  function deleteCountry(idx) {
-    if (idx < 0 || idx >= countries.length) {
+  function deleteCountry(name, timestamp) {
+    if (!confirm("Supprimer \"" + name + "\" ?\n\nCe pays sera supprimé pour tous les utilisateurs.")) {
       return;
     }
     
-    var name = countries[idx].name;
+    var grid = document.getElementById("grid");
+    grid.innerHTML = '<div class="loading-message">⏳ Suppression en cours...</div>';
     
-    if (confirm("Supprimer \"" + name + "\" ?")) {
-      countries.splice(idx, 1);
-      saveToCookie();
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete',
+        continent: CONTINENT,
+        name: name,
+        timestamp: timestamp
+      })
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(result) {
+      if (result.success) {
+        loadFromAPI();
+      } else {
+        alert("Erreur : " + result.message);
+        render();
+      }
+    })
+    .catch(function(error) {
+      console.error('Erreur:', error);
+      alert("Erreur de suppression");
       render();
-    }
+    });
   }
 
   document.getElementById("addBtn").onclick = function() {
@@ -464,6 +512,10 @@
     }
   };
 
+  document.getElementById("refreshBtn").onclick = function() {
+    loadFromAPI();
+  };
+
   document.getElementById("saveBtn").onclick = function() {
     var name = document.getElementById("inputName").value.trim();
     
@@ -472,29 +524,53 @@
       return;
     }
     
-    var country = {
-      id: Date.now(),
-      name: name,
-      flag: document.getElementById("inputFlag").value.trim(),
-      meta: document.getElementById("inputMeta").value.trim(),
-      land: document.getElementById("inputLandscape").value.trim(),
-      link: document.getElementById("inputLink").value.trim()
-    };
+    var flag = document.getElementById("inputFlag").value.trim();
+    var meta = document.getElementById("inputMeta").value.trim();
+    var land = document.getElementById("inputLandscape").value.trim();
+    var link = document.getElementById("inputLink").value.trim();
     
-    countries.push(country);
-    saveToCookie();
-    render();
+    var saveBtn = document.getElementById("saveBtn");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Ajout en cours...";
     
-    document.getElementById("myModal").className = "modal";
-    document.getElementById("inputName").value = "";
-    document.getElementById("inputFlag").value = "";
-    document.getElementById("inputMeta").value = "";
-    document.getElementById("inputLandscape").value = "";
-    document.getElementById("inputLink").value = "";
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'add',
+        continent: CONTINENT,
+        name: name,
+        flag: flag,
+        meta: meta,
+        land: land,
+        link: link
+      })
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(result) {
+      if (result.success) {
+        document.getElementById("myModal").className = "modal";
+        document.getElementById("inputName").value = "";
+        document.getElementById("inputFlag").value = "";
+        document.getElementById("inputMeta").value = "";
+        document.getElementById("inputLandscape").value = "";
+        document.getElementById("inputLink").value = "";
+        loadFromAPI();
+      } else {
+        alert("Erreur : " + result.message);
+      }
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Sauvegarder";
+    })
+    .catch(function(error) {
+      console.error('Erreur:', error);
+      alert("Erreur lors de l'ajout");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Sauvegarder";
+    });
   };
 
-  loadFromCookie();
-  render();
+  loadFromAPI();
 })();
 </script>
 
