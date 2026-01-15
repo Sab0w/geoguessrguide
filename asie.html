@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GeoGuessr - Asie</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg-color: #1a1a1a;
@@ -78,7 +79,24 @@
     max-width: 1200px;
     margin: 0 auto 30px auto;
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .refresh-btn {
+    background-color: #6b7280;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .refresh-btn:hover {
+    background-color: #4b5563;
   }
 
   .btn-add {
@@ -193,7 +211,7 @@
   .tag.meta { background: rgba(46, 204, 113, 0.2); color: var(--meta-color); border: 1px solid var(--meta-color); }
   .tag.landscape { background: rgba(230, 126, 34, 0.2); color: var(--landscape-color); border: 1px solid var(--landscape-color); }
 
-  .empty-message {
+  .empty-message, .loading-message {
     text-align: center;
     padding: 60px 20px;
     color: #888;
@@ -273,6 +291,11 @@
   button.save-btn:hover { 
     background-color: #dc2626; 
   }
+
+  button.save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 </style>
 </head>
 <body>
@@ -287,6 +310,7 @@
   </div>
 
   <div class="action-bar">
+    <button class="refresh-btn" id="refreshBtn">🔄 Actualiser</button>
     <button class="btn-add" id="addBtn">➕ Ajouter un pays</button>
   </div>
 
@@ -318,172 +342,174 @@
 
 <script>
 (function() {
-  var countries = [];
-  var cookieName = 'geoguessr_asie';
+  const SUPABASE_URL = 'https://iawoksstpmtppadktnmi.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhd29rc3N0cG10cHBhZGt0bm1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzUwOTAsImV4cCI6MjA4NDAxMTA5MH0.vl2Grce9qtU97lDKILYJughIfFpzY1TV-ELdmJkDaKg';
+  const CONTINENT = 'asie';
+  
+  let supabase;
+  
+  function initSupabase() {
+    if (typeof window.supabase === 'undefined') {
+      setTimeout(initSupabase, 100);
+      return;
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    loadCountries();
+  }
 
-  function saveToCookie() {
+  async function loadCountries() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '<div class="loading-message">⏳ Chargement des données...</div>';
+    
     try {
-      var data = JSON.stringify(countries);
-      var expires = new Date();
-      expires.setFullYear(expires.getFullYear() + 1);
-      document.cookie = cookieName + "=" + encodeURIComponent(data) + "; expires=" + expires.toUTCString() + "; path=/";
-      return true;
-    } catch(e) {
-      console.error("Erreur sauvegarde:", e);
-      return false;
+      const { data, error } = await supabase
+        .from('countries')
+        .select('*')
+        .eq('continent', CONTINENT)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      renderCountries(data || []);
+    } catch (error) {
+      console.error('Erreur:', error);
+      grid.innerHTML = '<div class="empty-message">❌ Erreur de chargement. Cliquez sur "Actualiser".</div>';
     }
   }
 
-  function loadFromCookie() {
-    try {
-      var cookies = document.cookie.split(';');
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        if (cookie.indexOf(cookieName + "=") === 0) {
-          var data = decodeURIComponent(cookie.substring(cookieName.length + 1));
-          countries = JSON.parse(data);
-          return true;
-        }
-      }
-    } catch(e) {
-      console.error("Erreur chargement:", e);
-    }
-    return false;
-  }
-
-  function render() {
-    var grid = document.getElementById("grid");
-    grid.innerHTML = "";
+  function renderCountries(countries) {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
     
     if (countries.length === 0) {
       grid.innerHTML = '<div class="empty-message">Aucun pays ajouté. Cliquez sur "➕ Ajouter un pays" !</div>';
       return;
     }
     
-    for (var i = 0; i < countries.length; i++) {
-      var c = countries[i];
+    countries.forEach(function(country) {
+      const card = document.createElement('div');
+      card.className = 'country-card';
       
-      var card = document.createElement("div");
-      card.className = "country-card";
-      card.setAttribute("data-index", i);
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.onclick = function(e) {
+        e.stopPropagation();
+        deleteCountry(country.id, country.name);
+      };
       
-      var deleteBtn = document.createElement("button");
-      deleteBtn.className = "delete-btn";
-      deleteBtn.textContent = "×";
-      deleteBtn.setAttribute("data-index", i);
+      const flagDiv = document.createElement('div');
+      flagDiv.className = 'flag-header';
+      flagDiv.style.backgroundImage = 'url(\'' + (country.flag || 'https://via.placeholder.com/300x150') + '\')';
       
-      var flagDiv = document.createElement("div");
-      flagDiv.className = "flag-header";
-      flagDiv.style.backgroundImage = "url('" + (c.flag || "https://via.placeholder.com/300x150") + "')";
-      
-      var nameDiv = document.createElement("div");
-      nameDiv.className = "country-name";
-      nameDiv.textContent = c.name;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'country-name';
+      nameDiv.textContent = country.name;
       flagDiv.appendChild(nameDiv);
       
-      var contentDiv = document.createElement("div");
-      contentDiv.className = "card-content";
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'card-content';
       
-      var metaRow = document.createElement("div");
-      metaRow.className = "hint-row";
-      metaRow.innerHTML = '<span class="tag meta">Méta</span><span>' + (c.meta || "-") + '</span>';
+      contentDiv.innerHTML = '<div class="hint-row"><span class="tag meta">Méta</span><span>' + (country.meta || '-') + '</span></div><div class="hint-row"><span class="tag landscape">Paysage</span><span>' + (country.land || '-') + '</span></div>';
       
-      var landRow = document.createElement("div");
-      landRow.className = "hint-row";
-      landRow.innerHTML = '<span class="tag landscape">Paysage</span><span>' + (c.land || "-") + '</span>';
-      
-      contentDiv.appendChild(metaRow);
-      contentDiv.appendChild(landRow);
+      if (country.link && country.link !== '#') {
+        contentDiv.onclick = function() { window.open(country.link, '_blank'); };
+        flagDiv.onclick = function() { window.open(country.link, '_blank'); };
+      }
       
       card.appendChild(deleteBtn);
       card.appendChild(flagDiv);
       card.appendChild(contentDiv);
-      
-      (function(link) {
-        contentDiv.onclick = function() {
-          if (link && link !== "#") {
-            window.open(link, "_blank");
-          }
-        };
-        flagDiv.onclick = function() {
-          if (link && link !== "#") {
-            window.open(link, "_blank");
-          }
-        };
-      })(c.link);
-      
       grid.appendChild(card);
-    }
-    
-    var deleteBtns = document.querySelectorAll(".delete-btn");
-    for (var j = 0; j < deleteBtns.length; j++) {
-      deleteBtns[j].onclick = function(e) {
-        e.stopPropagation();
-        var idx = parseInt(this.getAttribute("data-index"));
-        deleteCountry(idx);
-      };
-    }
+    });
   }
 
-  function deleteCountry(idx) {
-    if (idx < 0 || idx >= countries.length) {
+  async function deleteCountry(id, name) {
+    if (!confirm('Supprimer "' + name + '" ?\n\nCe pays sera supprimé pour tous les utilisateurs.')) {
       return;
     }
     
-    var name = countries[idx].name;
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '<div class="loading-message">⏳ Suppression en cours...</div>';
     
-    if (confirm("Supprimer \"" + name + "\" ?")) {
-      countries.splice(idx, 1);
-      saveToCookie();
-      render();
+    try {
+      const { error } = await supabase
+        .from('countries')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      await loadCountries();
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert('Erreur lors de la suppression');
+      await loadCountries();
     }
   }
 
-  document.getElementById("addBtn").onclick = function() {
-    document.getElementById("myModal").className = "modal show";
+  document.getElementById('addBtn').onclick = function() {
+    document.getElementById('myModal').className = 'modal show';
   };
 
-  document.getElementById("closeBtn").onclick = function() {
-    document.getElementById("myModal").className = "modal";
+  document.getElementById('closeBtn').onclick = function() {
+    document.getElementById('myModal').className = 'modal';
   };
 
-  document.getElementById("myModal").onclick = function(e) {
-    if (e.target === this) {
-      this.className = "modal";
+  document.getElementById('myModal').onclick = function(e) {
+    if (e.target.id === 'myModal') {
+      document.getElementById('myModal').className = 'modal';
     }
   };
 
-  document.getElementById("saveBtn").onclick = function() {
-    var name = document.getElementById("inputName").value.trim();
+  document.getElementById('refreshBtn').onclick = function() {
+    loadCountries();
+  };
+
+  document.getElementById('saveBtn').onclick = async function() {
+    const name = document.getElementById('inputName').value.trim();
     
     if (!name) {
-      alert("Le nom est obligatoire !");
+      alert('Le nom est obligatoire !');
       return;
     }
     
-    var country = {
-      id: Date.now(),
-      name: name,
-      flag: document.getElementById("inputFlag").value.trim(),
-      meta: document.getElementById("inputMeta").value.trim(),
-      land: document.getElementById("inputLandscape").value.trim(),
-      link: document.getElementById("inputLink").value.trim()
-    };
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Ajout en cours...';
     
-    countries.push(country);
-    saveToCookie();
-    render();
-    
-    document.getElementById("myModal").className = "modal";
-    document.getElementById("inputName").value = "";
-    document.getElementById("inputFlag").value = "";
-    document.getElementById("inputMeta").value = "";
-    document.getElementById("inputLandscape").value = "";
-    document.getElementById("inputLink").value = "";
+    try {
+      const { error } = await supabase
+        .from('countries')
+        .insert([{
+          continent: CONTINENT,
+          name: name,
+          flag: document.getElementById('inputFlag').value.trim(),
+          meta: document.getElementById('inputMeta').value.trim(),
+          land: document.getElementById('inputLandscape').value.trim(),
+          link: document.getElementById('inputLink').value.trim()
+        }]);
+      
+      if (error) throw error;
+      
+      document.getElementById('myModal').className = 'modal';
+      document.getElementById('inputName').value = '';
+      document.getElementById('inputFlag').value = '';
+      document.getElementById('inputMeta').value = '';
+      document.getElementById('inputLandscape').value = '';
+      document.getElementById('inputLink').value = '';
+      
+      await loadCountries();
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert('Erreur lors de l\'ajout');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Sauvegarder';
+    }
   };
 
-  loadFromCookie();
-  render();
+  initSupabase();
 })();
 </script>
 
