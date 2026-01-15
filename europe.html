@@ -8,7 +8,7 @@
 <style>
 :root{--bg:#1a1a1a;--card:#2d2d2d;--text:#fff;--accent:#4285F4;--meta:#2ecc71;--land:#e67e22;--del:#f55}
 *{box-sizing:border-box}
-body{background:var(--bg);font-family:'Segoe UI',sans-serif;color:var(--text);margin:0;padding:40px}
+body{background:var(--bg);font-family:'Segoe UI',sans-serif;color:var(--text);margin:0;padding:40px;overflow-x:hidden}
 .header{max-width:1200px;margin:0 auto 30px;display:flex;align-items:center;gap:20px}
 .back-btn{background:var(--card);color:#fff;padding:12px 20px;border:1px solid rgba(255,255,255,.1);border-radius:8px;text-decoration:none;font-weight:600;transition:all .3s}
 .back-btn:hover{background:var(--accent);border-color:var(--accent)}
@@ -72,9 +72,24 @@ textarea{resize:vertical;min-height:80px}
 .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:20px}
 .info-item{background:rgba(255,255,255,.05);padding:15px;border-radius:8px;border:1px solid rgba(255,255,255,.1)}
 .info-label{color:#888;font-size:.85rem;margin-bottom:5px;text-transform:uppercase}
+.main-view,.detail-view-page{transition:transform .4s ease,opacity .4s ease}
+.main-view{transform:translateX(0);opacity:1}
+.main-view.hidden{transform:translateX(-100%);opacity:0;pointer-events:none;position:absolute;width:100%}
+.detail-view-page{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);transform:translateX(100%);opacity:0;pointer-events:none;overflow-y:auto;padding:40px;z-index:50}
+.detail-view-page.active{transform:translateX(0);opacity:1;pointer-events:auto}
+.detail-container{max-width:1200px;margin:0 auto}
+.detail-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;padding-bottom:20px;border-bottom:2px solid #444}
+.detail-nav-left{display:flex;align-items:center;gap:20px}
+.detail-nav h1{margin:0;font-size:2.5rem;font-weight:700}
+.detail-nav-actions{display:flex;gap:10px}
+.country-flag-large{width:80px;height:60px;border-radius:8px;object-fit:cover;box-shadow:0 4px 8px rgba(0,0,0,.3)}
+.section-title{color:var(--accent);font-size:1.5rem;margin:40px 0 20px;font-weight:600}
+.edit-inline-btn{background:rgba(66,133,244,.2);color:var(--accent);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s}
+.edit-inline-btn:hover{background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
+<div class="main-view" id="mainView">
 <div class="header">
 <a href="index.html" class="back-btn">← Retour</a>
 <div class="title-wrapper"><h1>Europe</h1></div>
@@ -84,6 +99,11 @@ textarea{resize:vertical;min-height:80px}
 <button class="btn btn-primary" id="addCountryBtn">➕ Ajouter un pays</button>
 </div>
 <div class="grid" id="grid"></div>
+</div>
+
+<div class="detail-view-page" id="detailViewPage">
+<div class="detail-container" id="detailPageContent"></div>
+</div>
 
 <div id="countryModal" class="modal">
 <div class="modal-content">
@@ -204,16 +224,20 @@ g.appendChild(d);
 
 function showDetail(c){
 currentCountry=c;
-const d=document.getElementById('detailContent');
-let h=`<span class="close" id="closeDetailBtn">&times;</span>
-<div class="detail-header">
-<h2 class="detail-title">${c.name}</h2>
-<div style="display:flex;gap:10px">
-<button class="btn btn-secondary" id="closeDetailBtn2">Fermer</button>
-<button class="btn btn-primary" id="addSubcatBtn">+ Sous-catégorie</button>
+const page=document.getElementById('detailViewPage');
+const content=document.getElementById('detailPageContent');
+let h=`<div class="detail-nav">
+<div class="detail-nav-left">
+<button class="btn btn-secondary" id="backToListBtn">← Retour à la liste</button>
+${c.flag?`<img src="${c.flag}" class="country-flag-large" alt="${c.name}">`:''}
+<h1>${c.name}</h1>
+</div>
+<div class="detail-nav-actions">
+<button class="btn btn-secondary" id="editCountryInlineBtn">✏️ Modifier le pays</button>
+<button class="btn btn-primary" id="addSubcatInlineBtn">+ Sous-catégorie</button>
 </div>
 </div>
-<h3 style="color:var(--accent);margin-bottom:15px">Informations</h3>
+<h2 class="section-title">Informations générales</h2>
 <div class="info-grid">
 <div class="info-item"><div class="info-label">Méta</div><div>${c.meta||'-'}</div></div>
 <div class="info-item"><div class="info-label">Paysage</div><div>${c.land||'-'}</div></div>`;
@@ -225,14 +249,14 @@ h+=`<div class="info-item"><div class="info-label">${s.name}</div><div>${s.value
 h+=`</div>`;
 
 if(c.subcategories&&c.subcategories.length){
-h+=`<h3 style="color:var(--accent);margin:30px 0 15px">Sous-catégories</h3>`;
+h+=`<h2 class="section-title">Sous-catégories (${c.subcategories.length})</h2>`;
 c.subcategories.forEach((s,i)=>{
 h+=`<div class="subcat-section">
 <div class="subcat-header">
 <div class="subcat-name">${s.name}</div>
 <div style="display:flex;gap:8px">
-<button class="btn btn-secondary edit-subcat-btn" data-index="${i}" style="padding:8px 12px;font-size:.85rem">✏️ Modifier</button>
-<button class="btn btn-secondary del-subcat-btn" data-index="${i}" style="padding:8px 12px;font-size:.85rem;background:var(--del)">🗑️</button>
+<button class="edit-inline-btn edit-subcat-btn" data-index="${i}">✏️ Modifier</button>
+<button class="btn btn-secondary del-subcat-btn" data-index="${i}" style="padding:8px 12px;font-size:.85rem;background:var(--del)">🗑️ Supprimer</button>
 </div>
 </div>`;
 if(s.photos&&s.photos.length){
@@ -250,11 +274,19 @@ h+=`<div style="color:#888;padding:10px">Aucune photo</div>`;
 }
 h+=`</div>`;
 });
+}else{
+h+=`<div style="text-align:center;padding:60px;color:#888">
+<p style="font-size:1.2rem;margin-bottom:20px">Aucune sous-catégorie pour le moment</p>
+<button class="btn btn-primary" id="addFirstSubcatBtn">+ Créer la première sous-catégorie</button>
+</div>`;
 }
-d.innerHTML=h;
-document.getElementById('closeDetailBtn').onclick=closeDetailModal;
-document.getElementById('closeDetailBtn2').onclick=closeDetailModal;
-document.getElementById('addSubcatBtn').onclick=openAddSubcat;
+content.innerHTML=h;
+document.getElementById('backToListBtn').onclick=closeDetailPage;
+document.getElementById('editCountryInlineBtn').onclick=()=>editCountry(c);
+const addSubcatBtn=document.getElementById('addSubcatInlineBtn');
+if(addSubcatBtn)addSubcatBtn.onclick=openAddSubcat;
+const addFirstBtn=document.getElementById('addFirstSubcatBtn');
+if(addFirstBtn)addFirstBtn.onclick=openAddSubcat;
 document.querySelectorAll('.edit-subcat-btn').forEach(btn=>{
 btn.onclick=()=>editSubcat(parseInt(btn.dataset.index));
 });
@@ -264,7 +296,14 @@ btn.onclick=()=>deleteSubcat(parseInt(btn.dataset.index));
 document.querySelectorAll('.del-photo-btn').forEach(btn=>{
 btn.onclick=()=>deletePhoto(parseInt(btn.dataset.subcat),parseInt(btn.dataset.photo));
 });
-document.getElementById('detailModal').classList.add('show');
+document.getElementById('mainView').classList.add('hidden');
+page.classList.add('active');
+}
+
+function closeDetailPage(){
+document.getElementById('detailViewPage').classList.remove('active');
+document.getElementById('mainView').classList.remove('hidden');
+currentCountry=null;
 }
 
 function closeDetailModal(){
@@ -475,7 +514,10 @@ const {error}=await supabase.from('countries').update({subcategories:subcats}).e
 if(error)throw error;
 closeSubcatModal();
 const {data}=await supabase.from('countries').select('*').eq('id',currentCountry.id).single();
-if(data)showDetail(data);
+if(data){
+currentCountry=data;
+showDetail(data);
+}
 await loadCountries();
 }catch(e){
 console.error(e);
@@ -489,7 +531,10 @@ const subcats=currentCountry.subcategories.filter((_,idx)=>idx!==i);
 try{
 await supabase.from('countries').update({subcategories:subcats}).eq('id',currentCountry.id);
 const {data}=await supabase.from('countries').select('*').eq('id',currentCountry.id).single();
-if(data)showDetail(data);
+if(data){
+currentCountry=data;
+showDetail(data);
+}
 await loadCountries();
 }catch(e){
 alert('Erreur');
@@ -503,7 +548,10 @@ subcats[si].photos=subcats[si].photos.filter((_,i)=>i!==pi);
 try{
 await supabase.from('countries').update({subcategories:subcats}).eq('id',currentCountry.id);
 const {data}=await supabase.from('countries').select('*').eq('id',currentCountry.id).single();
-if(data)showDetail(data);
+if(data){
+currentCountry=data;
+showDetail(data);
+}
 await loadCountries();
 }catch(e){
 alert('Erreur');
