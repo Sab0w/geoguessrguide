@@ -99,6 +99,9 @@ textarea{resize:vertical;min-height:80px}
 .continent-item.active{background:rgba(66,133,244,.3);border-left:3px solid var(--accent);font-weight:600}
 .continent-emoji{font-size:1.5rem}
 .continent-name{flex:1}
+.continent-divider{height:1px;background:rgba(255,255,255,.1);margin:8px 0}
+.add-continent-btn{color:var(--accent);font-weight:600}
+.add-continent-btn:hover{background:rgba(66,133,244,.3)}
 
 /* Lightbox styles */
 .lightbox{display:none;position:fixed;z-index:200;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.95);align-items:center;justify-content:center;cursor:zoom-out}
@@ -112,6 +115,25 @@ textarea{resize:vertical;min-height:80px}
 .color-presets{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
 .color-preset{width:24px;height:24px;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:all .2s}
 .color-preset:hover{transform:scale(1.1);border-color:#fff}
+
+/* Emoji presets */
+.emoji-presets{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.emoji-preset{font-size:1.5rem;cursor:pointer;padding:5px;border-radius:6px;transition:all .2s}
+.emoji-preset:hover{background:rgba(66,133,244,.3);transform:scale(1.2)}
+
+/* Bouton supprimer catégorie */
+.btn-del-continent{background:rgba(255,85,85,.2);color:var(--del);border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;opacity:0;transition:opacity .3s;margin-left:auto}
+.continent-item:hover .btn-del-continent{opacity:1}
+.btn-del-continent:hover{background:var(--del);color:#fff}
+
+/* Logo type selector */
+.logo-type-selector{display:flex;gap:10px;margin:10px 0}
+.logo-type-btn{flex:1;padding:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:6px;cursor:pointer;font-size:.9rem;transition:all .3s}
+.logo-type-btn:hover{background:rgba(66,133,244,.2);border-color:var(--accent)}
+.logo-type-btn.active{background:rgba(66,133,244,.3);border-color:var(--accent);color:var(--accent);font-weight:600}
+.logo-preview{margin-top:10px;text-align:center}
+.logo-preview img{max-width:80px;max-height:80px;border-radius:8px;border:2px solid rgba(255,255,255,.2)}
+.continent-logo{width:30px;height:30px;border-radius:6px;object-fit:cover}
 </style>
 </head>
 <body>
@@ -150,6 +172,11 @@ textarea{resize:vertical;min-height:80px}
 <div class="continent-item" data-continent="antarctica">
 <span class="continent-emoji">🐧</span>
 <span class="continent-name">Antarctique</span>
+</div>
+<div class="continent-divider"></div>
+<div class="continent-item add-continent-btn" id="addContinentBtn">
+<span class="continent-emoji">➕</span>
+<span class="continent-name">Ajouter une catégorie</span>
 </div>
 </div>
 </div>
@@ -211,19 +238,56 @@ textarea{resize:vertical;min-height:80px}
 </div>
 </div>
 
+<div id="continentModal" class="modal">
+<div class="modal-content">
+<span class="close" id="closeContinentBtn">&times;</span>
+<h2>Ajouter une catégorie</h2>
+<label>Nom *</label>
+<input type="text" id="inputContinentName" placeholder="Moyen-Orient">
+<label>Type de logo</label>
+<div class="logo-type-selector">
+<button type="button" class="logo-type-btn active" data-type="emoji" id="logoTypeEmoji">😀 Emoji</button>
+<button type="button" class="logo-type-btn" data-type="image" id="logoTypeImage">🖼️ Image URL</button>
+</div>
+<div id="logoEmojiSection">
+<label>Emoji</label>
+<input type="text" id="inputContinentEmoji" placeholder="🕌" maxlength="2">
+<div class="emoji-presets">
+<span class="emoji-preset" data-emoji="🏔️">🏔️</span>
+<span class="emoji-preset" data-emoji="🏝️">🏝️</span>
+<span class="emoji-preset" data-emoji="🕌">🕌</span>
+<span class="emoji-preset" data-emoji="🗿">🗿</span>
+<span class="emoji-preset" data-emoji="⛩️">⛩️</span>
+<span class="emoji-preset" data-emoji="🌋">🌋</span>
+<span class="emoji-preset" data-emoji="🏜️">🏜️</span>
+<span class="emoji-preset" data-emoji="🌊">🌊</span>
+<span class="emoji-preset" data-emoji="🗺️">🗺️</span>
+<span class="emoji-preset" data-emoji="🌐">🌐</span>
+</div>
+</div>
+<div id="logoImageSection" style="display:none">
+<label>URL de l'image</label>
+<input type="text" id="inputContinentLogo" placeholder="https://exemple.com/logo.png">
+<div id="logoPreview" class="logo-preview"></div>
+</div>
+<button class="save-btn" id="saveContinentBtn">Ajouter</button>
+</div>
+</div>
+
 <script>
 (function(){
 const SUPABASE_URL='https://iawoksstpmtppadktnmi.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhd29rc3N0cG10cHBhZGt0bm1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzUwOTAsImV4cCI6MjA4NDAxMTA5MH0.vl2Grce9qtU97lDKILYJughIfFpzY1TV-ELdmJkDaKg';
 let CONTINENT='europe';
 let supabase,sections=[],currentCountry=null,editSubcatIdx=null,photos=[];
+let customContinents=JSON.parse(localStorage.getItem('customContinents')||'[]');
 
 // Couleurs prédéfinies pour les catégories
 const colorPresets=[
 '#2ecc71','#e67e22','#9b59b6','#3498db','#e74c3c','#1abc9c','#f39c12','#e91e63','#00bcd4','#8bc34a'
 ];
 
-const continentNames={
+const baseContinentNames={
 'europe':'Europe',
 'asia':'Asie',
 'africa':'Afrique',
@@ -232,6 +296,14 @@ const continentNames={
 'oceania':'Océanie',
 'antarctica':'Antarctique'
 };
+
+function getContinentNames(){
+const names={...baseContinentNames};
+customContinents.forEach(c=>{
+names[c.id]=c.name;
+});
+return names;
+}
 
 function hexToRgba(hex,alpha){
 const r=parseInt(hex.slice(1,3),16);
@@ -243,6 +315,7 @@ return `rgba(${r},${g},${b},${alpha})`;
 function init(){
 if(!window.supabase){setTimeout(init,100);return;}
 supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+renderCustomContinents();
 loadCountries();
 setupEvents();
 setupLightbox();
@@ -286,6 +359,38 @@ document.getElementById('addSectionBtn').onclick=addSection;
 document.getElementById('closeSubcatBtn').onclick=closeSubcatModal;
 document.getElementById('saveSubcatBtn').onclick=saveSubcat;
 document.getElementById('addPhotoBtn').onclick=addPhoto;
+
+// Événements pour le modal catégorie
+document.getElementById('addContinentBtn').onclick=openAddContinent;
+document.getElementById('closeContinentBtn').onclick=closeContinentModal;
+document.getElementById('saveContinentBtn').onclick=saveContinent;
+document.querySelectorAll('.emoji-preset').forEach(preset=>{
+preset.onclick=function(){
+document.getElementById('inputContinentEmoji').value=this.dataset.emoji;
+};
+});
+
+// Sélecteur type de logo
+document.getElementById('logoTypeEmoji').onclick=function(){
+document.getElementById('logoTypeEmoji').classList.add('active');
+document.getElementById('logoTypeImage').classList.remove('active');
+document.getElementById('logoEmojiSection').style.display='block';
+document.getElementById('logoImageSection').style.display='none';
+};
+document.getElementById('logoTypeImage').onclick=function(){
+document.getElementById('logoTypeImage').classList.add('active');
+document.getElementById('logoTypeEmoji').classList.remove('active');
+document.getElementById('logoImageSection').style.display='block';
+document.getElementById('logoEmojiSection').style.display='none';
+};
+document.getElementById('inputContinentLogo').addEventListener('input',function(){
+const preview=document.getElementById('logoPreview');
+if(this.value.trim()){
+preview.innerHTML=`<img src="${this.value}" onerror="this.style.display='none'" onload="this.style.display='block'">`;
+}else{
+preview.innerHTML='';
+}
+});
 
 const continentBtn=document.getElementById('continentButton');
 const dropdown=document.getElementById('continentDropdown');
@@ -339,8 +444,9 @@ loadCountries();
 }
 
 function updateContinentUI(){
+const continentNames=getContinentNames();
 document.getElementById('currentContinentName').textContent=continentNames[CONTINENT]||CONTINENT;
-document.querySelectorAll('.continent-item').forEach(item=>{
+document.querySelectorAll('.continent-item[data-continent]').forEach(item=>{
 if(item.dataset.continent===CONTINENT){
 item.classList.add('active');
 }else{
@@ -766,6 +872,87 @@ showDetail(data);
 await loadCountries();
 }catch(e){
 alert('Erreur');
+}
+}
+
+function renderCustomContinents(){
+const container=document.getElementById('continentDropdown');
+// Supprimer les anciens continents personnalisés
+container.querySelectorAll('.custom-continent').forEach(el=>el.remove());
+// Ajouter les nouveaux
+const divider=container.querySelector('.continent-divider');
+customContinents.forEach(c=>{
+const div=document.createElement('div');
+div.className='continent-item custom-continent';
+div.dataset.continent=c.id;
+const logoHtml=c.logo
+?`<img src="${c.logo}" class="continent-logo" alt="${c.name}">`
+:`<span class="continent-emoji">${c.emoji||'🌐'}</span>`;
+div.innerHTML=`${logoHtml}
+<span class="continent-name">${c.name}</span>
+<button class="btn-del-continent" data-id="${c.id}">×</button>`;
+div.onclick=function(e){
+if(e.target.classList.contains('btn-del-continent'))return;
+switchContinent(c.id);
+document.getElementById('continentButton').classList.remove('open');
+document.getElementById('continentDropdown').classList.remove('show');
+};
+div.querySelector('.btn-del-continent').onclick=function(e){
+e.stopPropagation();
+deleteContinent(c.id);
+};
+container.insertBefore(div,divider);
+});
+}
+
+function openAddContinent(){
+document.getElementById('inputContinentName').value='';
+document.getElementById('inputContinentEmoji').value='';
+document.getElementById('inputContinentLogo').value='';
+document.getElementById('logoPreview').innerHTML='';
+document.getElementById('logoTypeEmoji').classList.add('active');
+document.getElementById('logoTypeImage').classList.remove('active');
+document.getElementById('logoEmojiSection').style.display='block';
+document.getElementById('logoImageSection').style.display='none';
+document.getElementById('continentModal').classList.add('show');
+document.getElementById('continentButton').classList.remove('open');
+document.getElementById('continentDropdown').classList.remove('show');
+}
+
+function closeContinentModal(){
+document.getElementById('continentModal').classList.remove('show');
+}
+
+function saveContinent(){
+const name=document.getElementById('inputContinentName').value.trim();
+if(!name){alert('Le nom est obligatoire');return;}
+const isImageMode=document.getElementById('logoTypeImage').classList.contains('active');
+const emoji=document.getElementById('inputContinentEmoji').value.trim()||'🌐';
+const logo=document.getElementById('inputContinentLogo').value.trim();
+const id=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+if(baseContinentNames[id]||customContinents.find(c=>c.id===id)){
+alert('Cette catégorie existe déjà');return;
+}
+const newContinent={id,name};
+if(isImageMode&&logo){
+newContinent.logo=logo;
+}else{
+newContinent.emoji=emoji;
+}
+customContinents.push(newContinent);
+localStorage.setItem('customContinents',JSON.stringify(customContinents));
+renderCustomContinents();
+closeContinentModal();
+switchContinent(id);
+}
+
+function deleteContinent(id){
+if(!confirm('Supprimer cette catégorie ?'))return;
+customContinents=customContinents.filter(c=>c.id!==id);
+localStorage.setItem('customContinents',JSON.stringify(customContinents));
+renderCustomContinents();
+if(CONTINENT===id){
+switchContinent('europe');
 }
 }
 
