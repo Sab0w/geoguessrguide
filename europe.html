@@ -406,14 +406,32 @@ c.innerHTML='';
 photos.forEach((p,i)=>{
 const div=document.createElement('div');
 div.className='section';
-div.innerHTML=`<button class="btn-remove">×</button>
+div.innerHTML=`<button class="btn-remove" type="button">×</button>
 <label>URL Image</label>
-<input type="text" class="photo-url" value="${p.url||''}" placeholder="https://...">
+<input type="text" class="photo-url" data-index="${i}" value="${p.url||''}" placeholder="https://...">
 <label>Titre</label>
-<input type="text" class="photo-title" value="${p.title||''}" placeholder="Description">
-${p.url?`<img src="${p.url}" style="width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-top:10px">`:''}`;
-div.querySelector('.btn-remove').onclick=()=>removePhoto(i);
+<input type="text" class="photo-title" data-index="${i}" value="${p.title||''}" placeholder="Description">`;
+const urlInput=div.querySelector('.photo-url');
+urlInput.addEventListener('input',function(){
+photos[i].url=this.value;
+updatePhotoPreview();
+});
+const titleInput=div.querySelector('.photo-title');
+titleInput.addEventListener('input',function(){
+photos[i].title=this.value;
+});
+div.querySelector('.btn-remove').onclick=function(e){
+e.preventDefault();
+removePhoto(i);
+};
 c.appendChild(div);
+if(p.url){
+const img=document.createElement('img');
+img.src=p.url;
+img.style.cssText='width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-top:10px';
+img.onerror=function(){this.style.display='none';};
+div.appendChild(img);
+}
 });
 }
 
@@ -427,17 +445,23 @@ photos.splice(i,1);
 renderPhotos();
 }
 
+function updatePhotoPreview(){
+renderPhotos();
+}
+
 async function saveSubcat(){
 const name=document.getElementById('inputSubcatName').value.trim();
 if(!name){alert('Le nom est obligatoire');return;}
 
-const urls=document.querySelectorAll('.photo-url');
-const titles=document.querySelectorAll('.photo-title');
 const finalPhotos=[];
-for(let i=0;i<urls.length;i++){
-const u=urls[i].value.trim();
-if(u)finalPhotos.push({url:u,title:titles[i].value.trim()});
+photos.forEach(p=>{
+if(p.url&&p.url.trim()){
+finalPhotos.push({
+url:p.url.trim(),
+title:p.title?p.title.trim():''
+});
 }
+});
 
 const subcats=currentCountry.subcategories?[...currentCountry.subcategories]:[];
 if(editSubcatIdx!==null){
