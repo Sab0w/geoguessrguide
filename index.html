@@ -320,7 +320,7 @@ async function loadCountries(){
 const g=document.getElementById('grid');
 g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:#888">⏳ Chargement...</div>';
 try{
-const {data,error}=await supabase.from('countries').select('*').eq('continent',CONTINENT).order('created_at',{ascending:false});
+const {data,error}=await supabase.from('countries').select('*').eq('continent',CONTINENT).order('name',{ascending:true});
 if(error)throw error;
 renderCountries(data||[]);
 }catch(e){
