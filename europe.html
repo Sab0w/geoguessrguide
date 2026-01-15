@@ -147,30 +147,51 @@
     border-color: var(--accent-color);
   }
 
-  .delete-btn {
+  /* Card Actions Container */
+  .card-actions {
     position: absolute;
     top: 10px;
     right: 10px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .country-card:hover .card-actions {
+    opacity: 1;
+  }
+
+  .edit-btn, .delete-btn {
     background: rgba(0, 0, 0, 0.7);
-    color: var(--delete-color);
     border: none;
     border-radius: 50%;
     width: 32px;
     height: 32px;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    z-index: 10;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s;
-    opacity: 0;
     line-height: 1;
   }
 
-  .country-card:hover .delete-btn {
-    opacity: 1;
+  .edit-btn {
+    color: #4285F4;
+  }
+
+  .edit-btn:hover {
+    background: #4285F4;
+    color: white;
+    transform: scale(1.1);
+  }
+
+  .delete-btn {
+    color: var(--delete-color);
+    font-size: 20px;
   }
 
   .delete-btn:hover {
@@ -382,7 +403,7 @@
   <div id="myModal" class="modal">
     <div class="modal-content">
       <span class="close" id="closeBtn">&times;</span>
-      <h2>Ajouter un Pays</h2>
+      <h2 id="modalTitle">Ajouter un Pays</h2>
       
       <label>Nom du pays *</label>
       <input type="text" id="inputName" placeholder="Ex: France">
@@ -417,6 +438,7 @@
   
   let supabase;
   let customSections = [];
+  let editingCountryId = null; // Pour savoir si on édite ou on ajoute
   
   function initSupabase() {
     if (typeof window.supabase === 'undefined') {
@@ -460,13 +482,32 @@
       const card = document.createElement('div');
       card.className = 'country-card';
       
+      // Container pour les boutons d'action
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'card-actions';
+      
+      // Bouton d'édition
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit-btn';
+      editBtn.textContent = '✎';
+      editBtn.title = 'Modifier';
+      editBtn.onclick = function(e) {
+        e.stopPropagation();
+        openEditModal(country);
+      };
+      
+      // Bouton de suppression
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'delete-btn';
       deleteBtn.textContent = '×';
+      deleteBtn.title = 'Supprimer';
       deleteBtn.onclick = function(e) {
         e.stopPropagation();
         deleteCountry(country.id, country.name);
       };
+      
+      actionsDiv.appendChild(editBtn);
+      actionsDiv.appendChild(deleteBtn);
       
       const flagDiv = document.createElement('div');
       flagDiv.className = 'flag-header';
@@ -497,7 +538,7 @@
         flagDiv.onclick = function() { window.open(country.link, '_blank'); };
       }
       
-      card.appendChild(deleteBtn);
+      card.appendChild(actionsDiv);
       card.appendChild(flagDiv);
       card.appendChild(contentDiv);
       grid.appendChild(card);
@@ -527,6 +568,35 @@
     }
   }
 
+  function openEditModal(country) {
+    editingCountryId = country.id;
+    document.getElementById('modalTitle').textContent = 'Modifier le Pays';
+    document.getElementById('inputName').value = country.name || '';
+    document.getElementById('inputFlag').value = country.flag || '';
+    document.getElementById('inputMeta').value = country.meta || '';
+    document.getElementById('inputLandscape').value = country.land || '';
+    document.getElementById('inputLink').value = country.link || '';
+    
+    customSections = country.custom_sections ? [...country.custom_sections] : [];
+    renderCustomSections();
+    
+    document.getElementById('saveBtn').textContent = 'Mettre à jour';
+    document.getElementById('myModal').className = 'modal show';
+  }
+
+  function resetModal() {
+    editingCountryId = null;
+    document.getElementById('modalTitle').textContent = 'Ajouter un Pays';
+    document.getElementById('inputName').value = '';
+    document.getElementById('inputFlag').value = '';
+    document.getElementById('inputMeta').value = '';
+    document.getElementById('inputLandscape').value = '';
+    document.getElementById('inputLink').value = '';
+    customSections = [];
+    renderCustomSections();
+    document.getElementById('saveBtn').textContent = 'Sauvegarder';
+  }
+
   async function deleteCountry(id, name) {
     if (!confirm('Supprimer "' + name + '" ?\n\nCe pays sera supprimé pour tous les utilisateurs.')) {
       return;
@@ -552,18 +622,19 @@
   }
 
   document.getElementById('addBtn').onclick = function() {
-    customSections = [];
-    renderCustomSections();
+    resetModal();
     document.getElementById('myModal').className = 'modal show';
   };
 
   document.getElementById('closeBtn').onclick = function() {
     document.getElementById('myModal').className = 'modal';
+    resetModal();
   };
 
   document.getElementById('myModal').onclick = function(e) {
     if (e.target.id === 'myModal') {
       document.getElementById('myModal').className = 'modal';
+      resetModal();
     }
   };
 
@@ -598,38 +669,48 @@
     
     const saveBtn = document.getElementById('saveBtn');
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Ajout en cours...';
+    saveBtn.textContent = editingCountryId ? 'Mise à jour...' : 'Ajout en cours...';
     
     try {
-      const { error } = await supabase
-        .from('countries')
-        .insert([{
-          continent: CONTINENT,
-          name: name,
-          flag: document.getElementById('inputFlag').value.trim(),
-          meta: document.getElementById('inputMeta').value.trim(),
-          land: document.getElementById('inputLandscape').value.trim(),
-          link: document.getElementById('inputLink').value.trim(),
-          custom_sections: finalSections
-        }]);
+      const countryData = {
+        continent: CONTINENT,
+        name: name,
+        flag: document.getElementById('inputFlag').value.trim(),
+        meta: document.getElementById('inputMeta').value.trim(),
+        land: document.getElementById('inputLandscape').value.trim(),
+        link: document.getElementById('inputLink').value.trim(),
+        custom_sections: finalSections
+      };
+
+      let error;
+      
+      if (editingCountryId) {
+        // Mode édition : UPDATE
+        const result = await supabase
+          .from('countries')
+          .update(countryData)
+          .eq('id', editingCountryId);
+        error = result.error;
+      } else {
+        // Mode ajout : INSERT
+        const result = await supabase
+          .from('countries')
+          .insert([countryData]);
+        error = result.error;
+      }
       
       if (error) throw error;
       
       document.getElementById('myModal').className = 'modal';
-      document.getElementById('inputName').value = '';
-      document.getElementById('inputFlag').value = '';
-      document.getElementById('inputMeta').value = '';
-      document.getElementById('inputLandscape').value = '';
-      document.getElementById('inputLink').value = '';
-      customSections = [];
+      resetModal();
       
       await loadCountries();
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de l\'ajout: ' + error.message);
+      alert('Erreur lors de l\'opération: ' + error.message);
     } finally {
       saveBtn.disabled = false;
-      saveBtn.textContent = 'Sauvegarder';
+      saveBtn.textContent = editingCountryId ? 'Mettre à jour' : 'Sauvegarder';
     }
   };
 
