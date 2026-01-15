@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoGuessr - Europe</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#1a1a1a;--card:#2d2d2d;--text:#fff;--accent:#4285F4;--meta:#2ecc71;--land:#e67e22;--del:#f55}
+*{box-sizing:border-box}
+body{background:var(--bg);font-family:'Segoe UI',sans-serif;color:var(--text);margin:0;padding:40px;overflow-x:hidden}
+.header{max-width:1200px;margin:0 auto 30px;display:flex;align-items:center;gap:20px}
+.back-btn{background:var(--card);color:#fff;padding:12px 20px;border:1px solid rgba(255,255,255,.1);border-radius:8px;text-decoration:none;font-weight:600;transition:all .3s}
+.back-btn:hover{background:var(--accent);border-color:var(--accent)}
+.title-wrapper{flex:1;display:flex;align-items:center;justify-content:center;gap:15px}
+h1{font-weight:300;margin:0}
+.action-bar{max-width:1200px;margin:0 auto 30px;display:flex;justify-content:space-between}
+.btn{padding:12px 24px;border:none;border-radius:6px;font-size:1rem;font-weight:bold;cursor:pointer;transition:all .3s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#3367d6}
+.btn-secondary{background:#6b7280;color:#fff}
+.btn-secondary:hover{background:#4b5563}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:25px;max-width:1200px;margin:0 auto}
+.card{background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,.3);transition:transform .3s;border:1px solid rgba(255,255,255,.05);position:relative;cursor:pointer}
+.card:hover{transform:translateY(-5px);box-shadow:0 15px 30px rgba(0,0,0,.5);border-color:var(--accent)}
+.card-actions{position:absolute;top:10px;right:10px;display:flex;gap:8px;z-index:10;opacity:0;transition:opacity .3s}
+.card:hover .card-actions{opacity:1}
+.btn-icon{background:rgba(0,0,0,.7);border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s}
+.btn-edit{color:var(--accent)}
+.btn-edit:hover{background:var(--accent);color:#fff;transform:scale(1.1)}
+.btn-del{color:var(--del)}
+.btn-del:hover{background:var(--del);color:#fff;transform:scale(1.1)}
+.flag{height:140px;background-size:cover;background-position:center;position:relative}
+.flag::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60%;background:linear-gradient(to top,rgba(0,0,0,.9),transparent)}
+.country-name{position:relative;z-index:2;font-size:1.5rem;font-weight:700;padding:15px;height:140px;display:flex;align-items:flex-end;text-shadow:0 2px 4px rgba(0,0,0,.8)}
+.content{padding:20px}
+.row{display:flex;align-items:center;margin-bottom:12px;font-size:.95rem}
+.tag{font-size:.7rem;padding:3px 8px;border-radius:4px;font-weight:bold;text-transform:uppercase;margin-right:10px;min-width:60px;text-align:center}
+.tag.meta{background:rgba(46,204,113,.2);color:var(--meta);border:1px solid var(--meta)}
+.tag.land{background:rgba(230,126,34,.2);color:var(--land);border:1px solid var(--land)}
+.tag.custom{background:rgba(139,92,246,.2);color:#a78bfa;border:1px solid #a78bfa}
+.modal{display:none;position:fixed;z-index:100;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.8);overflow-y:auto}
+.modal.show{display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-content{background:var(--card);padding:30px;border-radius:12px;width:90%;max-width:800px;border:1px solid #444;max-height:90vh;overflow-y:auto}
+.close{color:#aaa;float:right;font-size:28px;font-weight:bold;cursor:pointer}
+.close:hover{color:#fff}
+label{display:block;margin-top:15px;margin-bottom:5px;font-weight:500}
+input,textarea{width:100%;padding:10px;background:#1a1a1a;border:1px solid #444;color:#fff;border-radius:6px;font-family:inherit}
+textarea{resize:vertical;min-height:80px}
+.divider{border-top:1px solid #444;margin:25px 0;padding-top:20px}
+.section{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:15px;margin-bottom:15px;position:relative}
+.subcat-section{background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);border-radius:12px;padding:20px;margin-bottom:20px}
+.subcat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.subcat-name{font-size:1.2rem;font-weight:600;color:var(--accent)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:15px;margin-top:15px}
+.photo{background:rgba(0,0,0,.3);border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.1);position:relative}
+.photo img{width:100%;height:120px;object-fit:cover}
+.photo-title{padding:10px;font-size:.85rem;color:#ccc}
+.photo-del{position:absolute;top:5px;right:5px;background:rgba(255,85,85,.9);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;opacity:0;transition:opacity .3s;font-size:14px;line-height:1}
+.photo:hover .photo-del{opacity:1}
+.add-photo{background:rgba(66,133,244,.1);border:2px dashed var(--accent);border-radius:8px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--accent);font-weight:600}
+.add-photo:hover{background:rgba(66,133,244,.2)}
+.btn-add-section{background:rgba(139,92,246,.2);color:#a78bfa;border:1px dashed #a78bfa;padding:10px;width:100%;border-radius:6px;cursor:pointer;font-weight:600;margin-top:15px}
+.btn-add-section:hover{background:rgba(139,92,246,.3)}
+.btn-remove{position:absolute;top:10px;right:10px;background:rgba(255,85,85,.2);color:var(--del);border:1px solid var(--del);border-radius:4px;padding:4px 8px;cursor:pointer;font-size:.8rem;font-weight:bold}
+.btn-remove:hover{background:var(--del);color:#fff}
+.save-btn{background:var(--accent);color:#fff;padding:12px;border:none;width:100%;border-radius:6px;cursor:pointer;font-size:1rem;font-weight:bold;margin-top:20px}
+.save-btn:hover{background:#3367d6}
+.save-btn:disabled{opacity:.5;cursor:not-allowed}
+.detail-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;padding-bottom:20px;border-bottom:2px solid #444}
+.detail-title{font-size:2rem;font-weight:700}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:20px}
+.info-item{background:rgba(255,255,255,.05);padding:15px;border-radius:8px;border:1px solid rgba(255,255,255,.1)}
+.info-label{color:#888;font-size:.85rem;margin-bottom:5px;text-transform:uppercase}
+.main-view,.detail-view-page{transition:transform .4s ease,opacity .4s ease}
+.main-view{transform:translateX(0);opacity:1}
+.main-view.hidden{transform:translateX(-100%);opacity:0;pointer-events:none;position:absolute;width:100%}
+.detail-view-page{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);transform:translateX(100%);opacity:0;pointer-events:none;overflow-y:auto;padding:40px;z-index:50}
+.detail-view-page.active{transform:translateX(0);opacity:1;pointer-events:auto}
+.detail-container{max-width:1200px;margin:0 auto}
+.detail-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;padding-bottom:20px;border-bottom:2px solid #444}
+.detail-nav-left{display:flex;align-items:center;gap:20px}
+.detail-nav h1{margin:0;font-size:2.5rem;font-weight:700}
+.detail-nav-actions{display:flex;gap:10px}
+.country-flag-large{width:80px;height:60px;border-radius:8px;object-fit:cover;box-shadow:0 4px 8px rgba(0,0,0,.3)}
+.section-title{color:var(--accent);font-size:1.5rem;margin:40px 0 20px;font-weight:600}
+.edit-inline-btn{background:rgba(66,133,244,.2);color:var(--accent);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s}
+.edit-inline-btn:hover{background:var(--accent);color:#fff}
+.continent-selector{position:relative;display:inline-block}
+.continent-button{background:var(--card);color:#fff;padding:12px 24px;border:1px solid rgba(255,255,255,.2);border-radius:8px;font-size:1.5rem;font-weight:300;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .3s}
+.continent-button:hover{background:rgba(66,133,244,.2);border-color:var(--accent)}
+.continent-button::after{content:'▼';font-size:.8rem;transition:transform .3s}
+.continent-button.open::after{transform:rotate(180deg)}
+.continent-dropdown{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid rgba(255,255,255,.2);border-radius:8px;min-width:250px;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:all .3s;z-index:1000;max-height:400px;overflow-y:auto}
+.continent-dropdown.show{opacity:1;visibility:visible}
+.continent-item{padding:12px 20px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.05)}
+.continent-item:last-child{border-bottom:none}
+.continent-item:hover{background:rgba(66,133,244,.2);padding-left:25px}
+.continent-item.active{background:rgba(66,133,244,.3);border-left:3px solid var(--accent);font-weight:600}
+.continent-emoji{font-size:1.5rem}
+.continent-name{flex:1}
+</style>
+</head>
+<body>
+<div class="main-view" id="mainView">
+<div class="header">
+<a href="index.html" class="back-btn">← Retour</a>
+<div class="title-wrapper">
+<div class="continent-selector">
+<button class="continent-button" id="continentButton">
+<span id="currentContinentName">Europe</span>
+</button>
+<div class="continent-dropdown" id="continentDropdown">
+<div class="continent-item" data-continent="europe">
+<span class="continent-emoji">🇪🇺</span>
+<span class="continent-name">Europe</span>
+</div>
+<div class="continent-item" data-continent="asia">
+<span class="continent-emoji">🌏</span>
+<span class="continent-name">Asie</span>
+</div>
+<div class="continent-item" data-continent="africa">
+<span class="continent-emoji">🌍</span>
+<span class="continent-name">Afrique</span>
+</div>
+<div class="continent-item" data-continent="north-america">
+<span class="continent-emoji">🌎</span>
+<span class="continent-name">Amérique du Nord</span>
+</div>
+<div class="continent-item" data-continent="south-america">
+<span class="continent-emoji">🌎</span>
+<span class="continent-name">Amérique du Sud</span>
+</div>
+<div class="continent-item" data-continent="oceania">
+<span class="continent-emoji">🌏</span>
+<span class="continent-name">Océanie</span>
+</div>
+<div class="continent-item" data-continent="antarctica">
+<span class="continent-emoji">🇦🇶</span>
+<span class="continent-name">Antarctique</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="action-bar">
+<button class="btn btn-secondary" id="refreshBtn">🔄 Actualiser</button>
+<button class="btn btn-primary" id="addCountryBtn">➕ Ajouter un pays</button>
+</div>
+<div class="grid" id="grid"></div>
+</div>
+
+<div class="detail-view-page" id="detailViewPage">
+<div class="detail-container" id="detailPageContent"></div>
+</div>
+
+<div id="countryModal" class="modal">
+<div class="modal-content">
+<span class="close" id="closeCountryBtn">&times;</span>
+<h2 id="countryModalTitle">Ajouter un Pays</h2>
+<label>Nom *</label>
+<input type="text" id="inputName" placeholder="France">
+<label>Drapeau (URL)</label>
+<input type="text" id="inputFlag" placeholder="https://...">
+<label>Méta</label>
+<input type="text" id="inputMeta" placeholder="Poteaux percés">
+<label>Paysage</label>
+<input type="text" id="inputLand" placeholder="Lignes jaunes">
+<div class="divider">
+<h3>Sections personnalisées</h3>
+<div id="sectionsContainer"></div>
+<button class="btn-add-section" id="addSectionBtn">+ Section</button>
+</div>
+<label>Lien (optionnel)</label>
+<input type="text" id="inputLink" placeholder="#">
+<button class="save-btn" id="saveCountryBtn">Sauvegarder</button>
+</div>
+</div>
+
+<div id="detailModal" class="modal">
+<div class="modal-content" id="detailContent"></div>
+</div>
+
+<div id="subcatModal" class="modal">
+<div class="modal-content">
+<span class="close" id="closeSubcatBtn">&times;</span>
+<h2 id="subcatModalTitle">Sous-catégorie</h2>
+<label>Nom *</label>
+<input type="text" id="inputSubcatName" placeholder="Architecture">
+<div class="divider">
+<h3>Photos</h3>
+<div id="photosContainer"></div>
+<button class="btn-add-section" id="addPhotoBtn">+ Photo</button>
+</div>
+<button class="save-btn" id="saveSubcatBtn">Sauvegarder</button>
+</div>
+</div>
+
+<script>
+(function(){
+const SUPABASE_URL='https://iawoksstpmtppadktnmi.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhd29rc3N0cG10cHBhZGt0bm1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzUwOTAsImV4cCI6MjA4NDAxMTA5MH0.vl2Grce9qtU97lDKILYJughIfFpzY1TV-ELdmJkDaKg';
+let CONTINENT='europe';
+let supabase,sections=[],currentCountry=null,editSubcatIdx=null,photos=[];
+
+const continentNames={
+'europe':'Europe',
+'asia':'Asie',
+'africa':'Afrique',
+'north-america':'Amérique du Nord',
+'south-america':'Amérique du Sud',
+'oceania':'Océanie',
+'antarctica':'Antarctique'
+};
+
+function init(){
+if(!window.supabase){setTimeout(init,100);return;}
+supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+loadCountries();
+setupEvents();
+}
+
+function setupEvents(){
+document.getElementById('refreshBtn').onclick=loadCountries;
+document.getElementById('addCountryBtn').onclick=openAddCountry;
+document.getElementById('closeCountryBtn').onclick=closeCountryModal;
+document.getElementById('saveCountryBtn').onclick=saveCountry;
+document.getElementById('addSectionBtn').onclick=addSection;
+document.getElementById('closeSubcatBtn').onclick=closeSubcatModal;
+document.getElementById('saveSubcatBtn').onclick=saveSubcat;
+document.getElementById('addPhotoBtn').onclick=addPhoto;
+
+const continentBtn=document.getElementById('continentButton');
+const dropdown=document.getElementById('continentDropdown');
+continentBtn.onclick=function(e){
+e.stopPropagation();
+continentBtn.classList.toggle('open');
+dropdown.classList.toggle('show');
+};
+
+document.addEventListener('click',function(e){
+if(!e.target.closest('.continent-selector')){
+continentBtn.classList.remove('open');
+dropdown.classList.remove('show');
+}
+});
+
+document.querySelectorAll('.continent-item').forEach(item=>{
+item.onclick=function(){
+const newContinent=this.dataset.continent;
+if(newContinent!==CONTINENT){
+switchContinent(newContinent);
+}
+continentBtn.classList.remove('open');
+dropdown.classList.remove('show');
+};
+});
+
+updateContinentUI();
+}
+
+async function loadCountries(){
+const g=document.getElementById('grid');
+g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:#888">⏳ Chargement...</div>';
+try{
+const {data,error}=await supabase.from('countries').select('*').eq('continent',CONTINENT).order('created_at',{ascending:false});
+if(error)throw error;
+renderCountries(data||[]);
+}catch(e){
+console.error(e);
+g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:#888">❌ Erreur de chargement</div>';
+}
+}
+
+function switchContinent(continent){
+CONTINENT=continent;
+updateContinentUI();
+if(document.getElementById('detailViewPage').classList.contains('active')){
+closeDetailPage();
+}
+loadCountries();
+}
+
+function updateContinentUI(){
+document.getElementById('currentContinentName').textContent=continentNames[CONTINENT]||CONTINENT;
+document.querySelectorAll('.continent-item').forEach(item=>{
+if(item.dataset.continent===CONTINENT){
+item.classList.add('active');
+}else{
+item.classList.remove('active');
+}
+});
+}
+
+function renderCountries(cs){
+const g=document.getElementById('grid');
+g.innerHTML='';
+if(!cs.length){
+g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:#888">Aucun pays</div>';
+return;
+}
+cs.forEach(c=>{
+const d=document.createElement('div');
+d.className='card';
+let html=`<div class="card-actions">
+<button class="btn-icon btn-edit">✏️</button>
+<button class="btn-icon btn-del">×</button>
+</div>
+<div class="flag" style="background-image:url('${c.flag||'https://via.placeholder.com/300x150'}')">
+<div class="country-name">${c.name}</div>
+</div>
+<div class="content">
+<div class="row"><span class="tag meta">Méta</span><span>${c.meta||'-'}</span></div>
+<div class="row"><span class="tag land">Paysage</span><span>${c.land||'-'}</span></div>`;
+if(c.custom_sections&&c.custom_sections.length){
+c.custom_sections.forEach(s=>{
+html+=`<div class="row"><span class="tag custom">${s.name}</span><span>${s.value||'-'}</span></div>`;
+});
+}
+if(c.subcategories&&c.subcategories.length){
+html+=`<div class="row"><span class="tag custom">Détails</span><span>${c.subcategories.length} sous-cat.</span></div>`;
+}
+html+=`</div>`;
+d.innerHTML=html;
+d.querySelector('.btn-edit').onclick=function(e){e.stopPropagation();editCountry(c);};
+d.querySelector('.btn-del').onclick=function(e){e.stopPropagation();deleteCountry(c);};
+d.onclick=()=>showDetail(c);
+g.appendChild(d);
+});
+}
+
+function showDetail(c){
+currentCountry=c;
+const page=document.getElementById('detailViewPage');
+const content=document.getElementById('detailPageContent');
+let h=`<div class="detail-nav">
+<div class="detail-nav-left">
+<button class="btn btn-secondary" id="backToListBtn">← Retour à la liste</button>
+${c.flag?`<img src="${c.flag}" class="country-flag-large" alt="${c.name}">`:''}
+<h1>${c.name}</h1>
+</div>
+<div class="detail-nav-actions">
+<button class="btn btn-secondary" id="editCountryInlineBtn">✏️ Modifier le pays</button>
+<button class="btn btn-primary" id="addSubcatInlineBtn">+ Sous-catégorie</button>
+</div>
+</div>
+<h2 class="section-title">Informations générales</h2>
+<div class="info-grid">
+<div class="info-item"><div class="info-label">Méta</div><div>${c.meta||'-'}</div></div>
+<div class="info-item"><div class="info-label">Paysage</div><div>${c.land||'-'}</div></div>`;
+if(c.custom_sections&&c.custom_sections.length){
+c.custom_sections.forEach(s=>{
+h+=`<div class="info-item"><div class="info-label">${s.name}</div><div>${s.value||'-'}</div></div>`;
+});
+}
+h+=`</div>`;
+
+if(c.subcategories&&c.subcategories.length){
+h+=`<h2 class="section-title">Sous-catégories (${c.subcategories.length})</h2>`;
+c.subcategories.forEach((s,i)=>{
+h+=`<div class="subcat-section">
+<div class="subcat-header">
+<div class="subcat-name">${s.name}</div>
+<div style="display:flex;gap:8px">
+<button class="edit-inline-btn edit-subcat-btn" data-index="${i}">✏️ Modifier</button>
+<button class="btn btn-secondary del-subcat-btn" data-index="${i}" style="padding:8px 12px;font-size:.85rem;background:var(--del)">🗑️ Supprimer</button>
+</div>
+</div>`;
+if(s.photos&&s.photos.length){
+h+=`<div class="gallery">`;
+s.photos.forEach((p,j)=>{
+h+=`<div class="photo">
+<button class="photo-del del-photo-btn" data-subcat="${i}" data-photo="${j}">×</button>
+<img src="${p.url}" alt="${p.title||'Photo'}">
+<div class="photo-title">${p.title||''}</div>
+</div>`;
+});
+h+=`</div>`;
+}else{
+h+=`<div style="color:#888;padding:10px">Aucune photo</div>`;
+}
+h+=`</div>`;
+});
+}else{
+h+=`<div style="text-align:center;padding:60px;color:#888">
+<p style="font-size:1.2rem;margin-bottom:20px">Aucune sous-catégorie pour le moment</p>
+<button class="btn btn-primary" id="addFirstSubcatBtn">+ Créer la première sous-catégorie</button>
+</div>`;
+}
+content.innerHTML=h;
+document.getElementById('backToListBtn').onclick=closeDetailPage;
+document.getElementById('editCountryInlineBtn').onclick=()=>editCountry(c);
+const addSubcatBtn=document.getElementById('addSubcatInlineBtn');
+if(addSubcatBtn)addSubcatBtn.onclick=openAddSubcat;
+const addFirstBtn=document.getElementById('addFirstSubcatBtn');
+if(addFirstBtn)addFirstBtn.onclick=openAddSubcat;
+document.querySelectorAll('.edit-subcat-btn').forEach(btn=>{
+btn.onclick=()=>editSubcat(parseInt(btn.dataset.index));
+});
+document.querySelectorAll('.del-subcat-btn').forEach(btn=>{
+btn.onclick=()=>deleteSubcat(parseInt(btn.dataset.index));
+});
+document.querySelectorAll('.del-photo-btn').forEach(btn=>{
+btn.onclick=()=>deletePhoto(parseInt(btn.dataset.subcat),parseInt(btn.dataset.photo));
+});
+document.getElementById('mainView').classList.add('hidden');
+page.classList.add('active');
+}
+
+function closeDetailPage(){
+document.getElementById('detailViewPage').classList.remove('active');
+document.getElementById('mainView').classList.remove('hidden');
+currentCountry=null;
+}
+
+function closeDetailModal(){
+document.getElementById('detailModal').classList.remove('show');
+currentCountry=null;
+}
+
+function openAddCountry(){
+currentCountry=null;
+sections=[];
+document.getElementById('countryModalTitle').textContent='Ajouter un Pays';
+document.getElementById('inputName').value='';
+document.getElementById('inputFlag').value='';
+document.getElementById('inputMeta').value='';
+document.getElementById('inputLand').value='';
+document.getElementById('inputLink').value='';
+renderSections();
+document.getElementById('countryModal').classList.add('show');
+}
+
+async function editCountry(c){
+currentCountry=c;
+sections=c.custom_sections||[];
+document.getElementById('countryModalTitle').textContent='Modifier '+c.name;
+document.getElementById('inputName').value=c.name||'';
+document.getElementById('inputFlag').value=c.flag||'';
+document.getElementById('inputMeta').value=c.meta||'';
+document.getElementById('inputLand').value=c.land||'';
+document.getElementById('inputLink').value=c.link||'';
+renderSections();
+document.getElementById('countryModal').classList.add('show');
+}
+
+function closeCountryModal(){
+document.getElementById('countryModal').classList.remove('show');
+}
+
+function renderSections(){
+const c=document.getElementById('sectionsContainer');
+c.innerHTML='';
+sections.forEach((s,i)=>{
+const div=document.createElement('div');
+div.className='section';
+div.innerHTML=`<button class="btn-remove">×</button>
+<label>Nom</label>
+<input type="text" class="section-name" value="${s.name}" placeholder="Architecture">
+<label>Valeur</label>
+<input type="text" class="section-value" value="${s.value}" placeholder="Maisons colorées">`;
+div.querySelector('.btn-remove').onclick=()=>removeSection(i);
+c.appendChild(div);
+});
+}
+
+function addSection(){
+sections.push({name:'',value:''});
+renderSections();
+}
+
+function removeSection(i){
+sections.splice(i,1);
+renderSections();
+}
+
+async function saveCountry(){
+const name=document.getElementById('inputName').value.trim();
+if(!name){alert('Le nom est obligatoire');return;}
+
+const ns=document.querySelectorAll('.section-name');
+const vs=document.querySelectorAll('.section-value');
+const finalSections=[];
+for(let i=0;i<ns.length;i++){
+const n=ns[i].value.trim();
+if(n)finalSections.push({name:n,value:vs[i].value.trim()});
+}
+
+const data={
+continent:CONTINENT,
+name,
+flag:document.getElementById('inputFlag').value.trim(),
+meta:document.getElementById('inputMeta').value.trim(),
+land:document.getElementById('inputLand').value.trim(),
+link:document.getElementById('inputLink').value.trim(),
+custom_sections:finalSections,
+subcategories:currentCountry?currentCountry.subcategories||[]:[]
+};
+
+try{
+if(currentCountry){
+const {error}=await supabase.from('countries').update(data).eq('id',currentCountry.id);
+if(error)throw error;
+}else{
+const {error}=await supabase.from('countries').insert([data]);
+if(error)throw error;
+}
+closeCountryModal();
+await loadCountries();
+}catch(e){
+console.error(e);
+alert('Erreur: '+e.message);
+}
+}
+
+async function deleteCountry(c){
+if(!confirm(`Supprimer "${c.name}" ?`))return;
+try{
+await supabase.from('countries').delete().eq('id',c.id);
+await loadCountries();
+}catch(e){
+alert('Erreur');
+}
+}
+
+function openAddSubcat(){
+editSubcatIdx=null;
+photos=[];
+document.getElementById('subcatModalTitle').textContent='Nouvelle Sous-catégorie';
+document.getElementById('inputSubcatName').value='';
+renderPhotos();
+document.getElementById('subcatModal').classList.add('show');
+}
+
+function editSubcat(i){
+editSubcatIdx=i;
+const s=currentCountry.subcategories[i];
+photos=s.photos?[...s.photos]:[];
+document.getElementById('subcatModalTitle').textContent='Modifier '+s.name;
+document.getElementById('inputSubcatName').value=s.name||'';
+renderPhotos();
+document.getElementById('subcatModal').classList.add('show');
+}
+
+function closeSubcatModal(){
+document.getElementById('subcatModal').classList.remove('show');
+}
+
+function renderPhotos(){
+const c=document.getElementById('photosContainer');
+c.innerHTML='';
+photos.forEach((p,i)=>{
+const div=document.createElement('div');
+div.className='section';
+div.innerHTML=`<button class="btn-remove" type="button">×</button>
+<label>URL Image</label>
+<input type="text" class="photo-url" data-index="${i}" value="${p.url||''}" placeholder="https://...">
+<label>Titre</label>
+<input type="text" class="photo-title" data-index="${i}" value="${p.title||''}" placeholder="Description">`;
+const urlInput=div.querySelector('.photo-url');
+urlInput.addEventListener('input',function(){
+photos[i].url=this.value;
+updatePhotoPreview();
+});
+const titleInput=div.querySelector('.photo-title');
+titleInput.addEventListener('input',function(){
+photos[i].title=this.value;
+});
+div.querySelector('.btn-remove').onclick=function(e){
+e.preventDefault();
+removePhoto(i);
+};
+c.appendChild(div);
+if(p.url){
+const img=document.createElement('img');
+img.src=p.url;
+img.style.cssText='width:100%;max-height:150px;object-fit:cover;border-radius:6px;margin-top:10px';
+img.onerror=function(){this.style.display='none';};
+div.appendChild(img);
+}
+});
+}
+
+function addPhoto(){
+photos.push({url:'',title:''});
+renderPhotos();
+}
+
+function removePhoto(i){
+photos.splice(i,1);
+renderPhotos();
+}
+
+function updatePhotoPreview(){
+renderPhotos();
+}
+
+async function saveSubcat(){
+const name=document.getElementById('inputSubcatName').value.trim();
+if(!name){alert('Le nom est obligatoire');return;}
+
+const finalPhotos=[];
+photos.forEach(p=>{
+if(p.url&&p.url.trim()){
+finalPhotos.push({
+url:p.url.trim(),
+title:p.title?p.title.trim():''
+});
+}
+});
+
+const subcats=currentCountry.subcategories?[...currentCountry.subcategories]:[];
+if(editSubcatIdx!==null){
+subcats[editSubcatIdx]={name,photos:finalPhotos};
+}else{
+subcats.push({name,photos:finalPhotos});
+}
+
+try{
+const {error}=await supabase.from('countries').update({subcategories:subcats}).eq('id',currentCountry.id);
+if(error)throw error;
+closeSubcatModal();
+const {data}=await supabase.from('countries').select('*').eq('id',currentCountry.id).single();
+if(data){
+currentCountry=data;
+showDetail(data);
+}
+await loadCountries();
+}catch(e){
+console.error(e);
+alert('Erreur: '+e.message);
+}
+}
+
+async function deleteSubcat(i){
+if(!confirm('Supprimer cette sous-catégorie ?'))return;
+const subcats=currentCountry.subcategories.filter((_,idx)=>idx!==i);
+try{
+await supabase.from('countries').update({subcategories:subcats}).eq('id',currentCountry.id);
+const {data}=await supabase.from('countries').select('*').eq('id',currentCountry.id).single();
+if(data){
+currentCountry=data;
+showDetail(data);
+}
+await loadCountries();
+}catch(e){
+alert('Erreur');
+}
+}
+
+async function deletePhoto(si,pi){
+if(!confirm('Supprimer cette photo ?'))return;
+const subcats=[...currentCountry.subcategories];
+subcats[si].photos=subcats[si].photos.filter((_,i)=>i!==pi);
+try{
+await supabase.from('countries').update({subcategories:subcats}).eq('id',currentCountry.id);
+const {data}=await supabase.from('countries').select('*').eq('id',currentCountry.id).single();
+if(data){
+currentCountry=data;
+showDetail(data);
+}
+await loadCountries();
+}catch(e){
+alert('Erreur');
+}
+}
+
+init();
+})();
+</script>
+</body>
+</html>
