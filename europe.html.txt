@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoGuessr Manager</title>
+<style>
+  :root {
+    --bg-color: #1a1a1a;
+    --card-bg: #2d2d2d;
+    --text-color: #ffffff;
+    --accent-color: #4285F4;
+    --meta-color: #2ecc71;
+    --landscape-color: #e67e22;
+    --delete-color: #ff5555;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background-color: var(--bg-color);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--text-color);
+    margin: 0;
+    padding: 40px;
+  }
+
+  h1 { text-align: center; font-weight: 300; margin-bottom: 20px; }
+
+  .action-bar {
+    max-width: 1200px;
+    margin: 0 auto 30px auto;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .action-bar select {
+    flex: 1;
+    padding: 12px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  .action-bar button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+  }
+
+  .btn-add {
+    background-color: var(--accent-color);
+    color: white;
+  }
+
+  .btn-add:hover {
+    background-color: #3367d6;
+  }
+
+  .btn-delete {
+    background-color: var(--delete-color);
+    color: white;
+  }
+
+  .btn-delete:hover {
+    background-color: #ff3333;
+  }
+
+  .btn-delete:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .country-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none;
+    color: white;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    transition: transform 0.3s, box-shadow 0.3s;
+    border: 1px solid rgba(255,255,255,0.05);
+    display: block;
+  }
+
+  .country-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+    border-color: var(--accent-color);
+  }
+
+  .flag-header {
+    height: 140px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+  }
+
+  .flag-header::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 60%;
+    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+  }
+
+  .country-name {
+    position: relative; z-index: 2; font-size: 1.5rem; font-weight: 700;
+    padding: 15px; 
+    height: 140px;
+    display: flex;
+    align-items: flex-end;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  }
+
+  .card-content { padding: 20px; }
+
+  .hint-row {
+    display: flex; align-items: center; margin-bottom: 12px;
+    font-size: 0.95rem; line-height: 1.4;
+  }
+
+  .tag {
+    font-size: 0.7rem; padding: 3px 8px; border-radius: 4px;
+    font-weight: bold; text-transform: uppercase; margin-right: 10px;
+    min-width: 60px; text-align: center;
+  }
+  .tag.meta { background: rgba(46, 204, 113, 0.2); color: var(--meta-color); border: 1px solid var(--meta-color); }
+  .tag.landscape { background: rgba(230, 126, 34, 0.2); color: var(--landscape-color); border: 1px solid var(--landscape-color); }
+
+  .empty-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: #888;
+    font-size: 1.1rem;
+    grid-column: 1 / -1;
+  }
+
+  .modal {
+    display: none; 
+    position: fixed; 
+    z-index: 100;
+    left: 0; 
+    top: 0; 
+    width: 100%; 
+    height: 100%;
+    background-color: rgba(0,0,0,0.8);
+  }
+  
+  .modal.show {
+    display: flex;
+    align-items: center; 
+    justify-content: center;
+  }
+  
+  .modal-content {
+    background-color: #2d2d2d; 
+    padding: 30px; 
+    border-radius: 12px;
+    width: 400px; 
+    max-width: 90%; 
+    position: relative;
+    border: 1px solid #444;
+  }
+  
+  .close {
+    color: #aaa; 
+    float: right; 
+    font-size: 28px; 
+    font-weight: bold; 
+    cursor: pointer;
+    line-height: 20px;
+  }
+  
+  .close:hover {
+    color: white;
+  }
+  
+  label {
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  
+  input {
+    width: 100%; 
+    padding: 10px;
+    background: #1a1a1a; 
+    border: 1px solid #444;
+    color: white; 
+    border-radius: 6px;
+  }
+  
+  button.save-btn {
+    background-color: var(--accent-color); 
+    color: white;
+    padding: 12px; 
+    border: none; 
+    width: 100%; 
+    border-radius: 6px;
+    cursor: pointer; 
+    font-size: 1rem; 
+    font-weight: bold; 
+    margin-top: 20px;
+  }
+  
+  button.save-btn:hover { 
+    background-color: #3367d6; 
+  }
+
+  .info-banner {
+    max-width: 1200px;
+    margin: 0 auto 20px;
+    background: rgba(66, 133, 244, 0.2);
+    border: 1px solid var(--accent-color);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+
+  <h1>🌍 Mon Guide GeoGuessr</h1>
+
+  <div class="info-banner">
+    ⚠️ Note: Les données sont sauvegardées dans les cookies. Si ça ne fonctionne pas sur Google Sites, utilisez CodePen.io ou téléchargez ce fichier HTML.
+  </div>
+
+  <div class="action-bar">
+    <select id="countrySelect">
+      <option value="">-- Sélectionner un pays à supprimer --</option>
+    </select>
+    <button class="btn-delete" id="deleteBtn">🗑️ Supprimer</button>
+    <button class="btn-add" id="addBtn">➕ Ajouter</button>
+  </div>
+
+  <div class="grid-container" id="grid"></div>
+
+  <div id="myModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeBtn">&times;</span>
+      <h2>Ajouter un Pays</h2>
+      
+      <label>Nom du pays *</label>
+      <input type="text" id="inputName" placeholder="Ex: France">
+      
+      <label>Lien du Drapeau (Image)</label>
+      <input type="text" id="inputFlag" placeholder="https://flagcdn.com/w640/fr.png">
+      
+      <label>Indice Technique (Méta)</label>
+      <input type="text" id="inputMeta" placeholder="Ex: Poteaux percés">
+      
+      <label>Indice Paysage / Route</label>
+      <input type="text" id="inputLandscape" placeholder="Ex: Lignes jaunes">
+      
+      <label>Lien vers page (Optionnel)</label>
+      <input type="text" id="inputLink" placeholder="#">
+
+      <button class="save-btn" id="saveBtn">Sauvegarder</button>
+    </div>
+  </div>
+
+<script>
+(function() {
+  var countries = [];
+
+  function saveToCookie() {
+    try {
+      var data = JSON.stringify(countries);
+      var expires = new Date();
+      expires.setFullYear(expires.getFullYear() + 1);
+      document.cookie = "geoguessr_data=" + encodeURIComponent(data) + "; expires=" + expires.toUTCString() + "; path=/";
+      return true;
+    } catch(e) {
+      console.error("Erreur sauvegarde:", e);
+      return false;
+    }
+  }
+
+  function loadFromCookie() {
+    try {
+      var cookies = document.cookie.split(';');
+      for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i].trim();
+        if (cookie.indexOf("geoguessr_data=") === 0) {
+          var data = decodeURIComponent(cookie.substring(15));
+          countries = JSON.parse(data);
+          return true;
+        }
+      }
+    } catch(e) {
+      console.error("Erreur chargement:", e);
+    }
+    return false;
+  }
+
+  function render() {
+    var grid = document.getElementById("grid");
+    var select = document.getElementById("countrySelect");
+    var deleteBtn = document.getElementById("deleteBtn");
+    
+    grid.innerHTML = "";
+    select.innerHTML = '<option value="">-- Sélectionner un pays à supprimer --</option>';
+    
+    if (countries.length === 0) {
+      grid.innerHTML = '<div class="empty-message">Aucun pays ajouté. Cliquez sur "➕ Ajouter" !</div>';
+      deleteBtn.disabled = true;
+      return;
+    }
+    
+    deleteBtn.disabled = false;
+    
+    for (var i = 0; i < countries.length; i++) {
+      var c = countries[i];
+      
+      var card = document.createElement("a");
+      card.className = "country-card";
+      card.href = c.link || "#";
+      if (c.link && c.link !== "#") card.target = "_blank";
+      
+      var flagDiv = document.createElement("div");
+      flagDiv.className = "flag-header";
+      flagDiv.style.backgroundImage = "url('" + (c.flag || "https://via.placeholder.com/300x150") + "')";
+      
+      var nameDiv = document.createElement("div");
+      nameDiv.className = "country-name";
+      nameDiv.textContent = c.name;
+      flagDiv.appendChild(nameDiv);
+      
+      var contentDiv = document.createElement("div");
+      contentDiv.className = "card-content";
+      
+      var metaRow = document.createElement("div");
+      metaRow.className = "hint-row";
+      metaRow.innerHTML = '<span class="tag meta">Méta</span><span>' + (c.meta || "-") + '</span>';
+      
+      var landRow = document.createElement("div");
+      landRow.className = "hint-row";
+      landRow.innerHTML = '<span class="tag landscape">Paysage</span><span>' + (c.land || "-") + '</span>';
+      
+      contentDiv.appendChild(metaRow);
+      contentDiv.appendChild(landRow);
+      
+      card.appendChild(flagDiv);
+      card.appendChild(contentDiv);
+      grid.appendChild(card);
+      
+      var opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = c.name;
+      select.appendChild(opt);
+    }
+  }
+
+  document.getElementById("addBtn").onclick = function() {
+    document.getElementById("myModal").className = "modal show";
+  };
+
+  document.getElementById("closeBtn").onclick = function() {
+    document.getElementById("myModal").className = "modal";
+  };
+
+  document.getElementById("myModal").onclick = function(e) {
+    if (e.target === this) {
+      this.className = "modal";
+    }
+  };
+
+  document.getElementById("saveBtn").onclick = function() {
+    var name = document.getElementById("inputName").value.trim();
+    
+    if (!name) {
+      alert("Le nom est obligatoire !");
+      return;
+    }
+    
+    var country = {
+      id: Date.now(),
+      name: name,
+      flag: document.getElementById("inputFlag").value.trim(),
+      meta: document.getElementById("inputMeta").value.trim(),
+      land: document.getElementById("inputLandscape").value.trim(),
+      link: document.getElementById("inputLink").value.trim()
+    };
+    
+    countries.push(country);
+    saveToCookie();
+    render();
+    
+    document.getElementById("myModal").className = "modal";
+    document.getElementById("inputName").value = "";
+    document.getElementById("inputFlag").value = "";
+    document.getElementById("inputMeta").value = "";
+    document.getElementById("inputLandscape").value = "";
+    document.getElementById("inputLink").value = "";
+  };
+
+  document.getElementById("deleteBtn").onclick = function() {
+    var select = document.getElementById("countrySelect");
+    var idx = parseInt(select.value);
+    
+    if (isNaN(idx) || idx < 0) {
+      alert("Sélectionnez un pays à supprimer");
+      return;
+    }
+    
+    if (idx >= countries.length) {
+      alert("Erreur: pays introuvable");
+      return;
+    }
+    
+    var name = countries[idx].name;
+    
+    if (confirm("Supprimer \"" + name + "\" ?")) {
+      countries.splice(idx, 1);
+      saveToCookie();
+      render();
+    }
+  };
+
+  loadFromCookie();
+  render();
+})();
+</script>
+
+</body>
+</html>
