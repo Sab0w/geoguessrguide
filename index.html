@@ -361,7 +361,10 @@ document.getElementById('saveSubcatBtn').onclick=saveSubcat;
 document.getElementById('addPhotoBtn').onclick=addPhoto;
 
 // Événements pour le modal catégorie
-document.getElementById('addContinentBtn').onclick=openAddContinent;
+document.getElementById('addContinentBtn').onclick=function(e){
+e.stopPropagation();
+openAddContinent();
+};
 document.getElementById('closeContinentBtn').onclick=closeContinentModal;
 document.getElementById('saveContinentBtn').onclick=saveContinent;
 document.querySelectorAll('.emoji-preset').forEach(preset=>{
@@ -407,10 +410,10 @@ dropdown.classList.remove('show');
 }
 });
 
-document.querySelectorAll('.continent-item').forEach(item=>{
+document.querySelectorAll('.continent-item:not(.add-continent-btn)').forEach(item=>{
 item.onclick=function(){
 const newContinent=this.dataset.continent;
-if(newContinent!==CONTINENT){
+if(newContinent&&newContinent!==CONTINENT){
 switchContinent(newContinent);
 }
 continentBtn.classList.remove('open');
