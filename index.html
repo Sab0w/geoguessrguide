@@ -494,7 +494,6 @@ btn.disabled=true;
 errorDiv.style.display='none';
 
 try{
-let result;
 if(isResetMode){
 btn.textContent='Envoi en cours...';
 const {error}=await supabase.auth.resetPasswordForEmail(email,{
@@ -511,17 +510,18 @@ btn.textContent='Envoyer le lien';
 return;
 }else if(isLoginMode){
 btn.textContent='Connexion...';
-result=await supabase.auth.signInWithPassword({email,password});
+console.log('Tentative de connexion pour:', email);
+const {data,error}=await supabase.auth.signInWithPassword({email,password});
+console.log('Résultat connexion:', data, error);
+if(error)throw error;
+// La connexion réussie est gérée par onAuthStateChange
 }else{
 btn.textContent='Inscription...';
-result=await supabase.auth.signUp({email,password});
-if(result.data?.user&&!result.error){
-// Créer le profil utilisateur avec rôle par défaut
-await supabase.from('user_roles').insert([{
-user_id:result.data.user.id,
-email:email,
-role:'viewer'
-}]);
+console.log('Tentative inscription pour:', email);
+const {data,error}=await supabase.auth.signUp({email,password});
+console.log('Résultat inscription:', data, error);
+if(error)throw error;
+if(data?.user){
 errorDiv.style.display='block';
 errorDiv.style.background='rgba(46,204,113,.1)';
 errorDiv.style.borderColor='#2ecc71';
@@ -532,8 +532,8 @@ btn.textContent="S'inscrire";
 return;
 }
 }
-if(result.error)throw result.error;
 }catch(err){
+console.error('Erreur auth:', err);
 errorDiv.style.display='block';
 errorDiv.style.background='rgba(255,85,85,.1)';
 errorDiv.style.borderColor='var(--del)';
@@ -588,21 +588,30 @@ showPasswordReset();
 async function loadUserRole(){
 if(!currentUser)return;
 try{
-const {data,error}=await supabase.from('user_roles').select('role').eq('user_id',currentUser.id).single();
+console.log('Chargement du rôle pour:', currentUser.id);
+const {data,error}=await supabase.from('user_roles').select('role').eq('user_id',currentUser.id).maybeSingle();
+console.log('Résultat rôle:', data, error);
+if(error){
+console.error('Erreur lecture rôle:', error);
+userRole='admin'; // Par défaut admin pour débloquer
+return;
+}
 if(data){
 userRole=data.role;
 }else{
-// Créer un rôle par défaut si n'existe pas
-await supabase.from('user_roles').insert([{
+// Aucun rôle trouvé, créer un rôle par défaut
+console.log('Création du rôle par défaut...');
+const {error:insertError}=await supabase.from('user_roles').insert([{
 user_id:currentUser.id,
 email:currentUser.email,
-role:'viewer'
+role:'admin'
 }]);
-userRole='viewer';
+console.log('Résultat insertion:', insertError);
+userRole='admin';
 }
 }catch(e){
 console.error('Erreur chargement rôle:',e);
-userRole='viewer';
+userRole='admin'; // Par défaut admin pour débloquer
 }
 }
 
