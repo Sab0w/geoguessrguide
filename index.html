@@ -48,6 +48,8 @@ textarea{resize:vertical;min-height:80px}
 .section-row{display:flex;gap:10px;align-items:flex-end}
 .section-row .field{flex:1}
 .section-row .field-color{flex:0 0 auto}
+.section-photo-preview{margin-top:10px}
+.section-photo-preview img{max-width:100%;max-height:150px;border-radius:8px;border:1px solid rgba(255,255,255,.2)}
 .subcat-section{background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);border-radius:12px;padding:20px;margin-bottom:20px}
 .subcat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
 .subcat-name{font-size:1.2rem;font-weight:600;color:var(--accent)}
@@ -72,6 +74,10 @@ textarea{resize:vertical;min-height:80px}
 .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:20px}
 .info-item{background:rgba(255,255,255,.05);padding:15px;border-radius:8px;border:1px solid rgba(255,255,255,.1)}
 .info-label{font-size:.85rem;margin-bottom:5px;text-transform:uppercase}
+.info-photo{margin-top:10px;cursor:pointer;transition:transform .2s}
+.info-photo:hover{transform:scale(1.02)}
+.info-photo img{width:100%;max-height:150px;object-fit:cover;border-radius:8px}
+.info-photo-desc{font-size:.8rem;color:#aaa;margin-top:5px;font-style:italic}
 .main-view,.detail-view-page{transition:transform .4s ease,opacity .4s ease}
 .main-view{transform:translateX(0);opacity:1}
 .main-view.hidden{transform:translateX(-100%);opacity:0;pointer-events:none;position:absolute;width:100%}
@@ -518,7 +524,14 @@ h+=`<h2 class="section-title">Informations générales</h2>
 <div class="info-grid">`;
 c.custom_sections.forEach(s=>{
 const color=s.color||'#a78bfa';
-h+=`<div class="info-item"><div class="info-label" style="color:${color}">${s.name}</div><div>${s.value||'-'}</div></div>`;
+h+=`<div class="info-item">
+<div class="info-label" style="color:${color}">${s.name}</div>
+<div>${s.value||'-'}</div>
+${s.photo?`<div class="info-photo" data-url="${s.photo}" data-title="${s.photoDesc||''}">
+<img src="${s.photo}" alt="${s.photoDesc||'Photo'}">
+${s.photoDesc?`<div class="info-photo-desc">${s.photoDesc}</div>`:''}
+</div>`:''}
+</div>`;
 });
 h+=`</div>`;
 }
@@ -577,6 +590,13 @@ deletePhoto(parseInt(btn.dataset.subcat),parseInt(btn.dataset.photo));
 document.querySelectorAll('.photo').forEach(photo=>{
 photo.onclick=function(e){
 if(e.target.classList.contains('photo-del'))return;
+const url=this.dataset.url;
+const title=this.dataset.title;
+openLightbox(url,title);
+};
+});
+document.querySelectorAll('.info-photo').forEach(photo=>{
+photo.onclick=function(){
 const url=this.dataset.url;
 const title=this.dataset.title;
 openLightbox(url,title);
@@ -645,7 +665,12 @@ div.innerHTML=`<button class="btn-remove">×</button>
 ${colorPresets.map(color=>`<div class="color-preset" data-color="${color}" style="background:${color}"></div>`).join('')}
 </div>
 <label>Valeur</label>
-<input type="text" class="section-value" value="${s.value||''}" placeholder="Description...">`;
+<input type="text" class="section-value" value="${s.value||''}" placeholder="Description...">
+<label>Photo (URL optionnelle)</label>
+<input type="text" class="section-photo" value="${s.photo||''}" placeholder="https://exemple.com/image.jpg">
+<div class="section-photo-preview">${s.photo?`<img src="${s.photo}" onerror="this.style.display='none'">`:''}</div>
+<label>Description de la photo</label>
+<input type="text" class="section-photo-desc" value="${s.photoDesc||''}" placeholder="Description de l'image...">`;
 div.querySelector('.btn-remove').onclick=()=>removeSection(i);
 // Mise à jour de la couleur via input
 div.querySelector('.section-color').addEventListener('input',function(){
@@ -666,6 +691,20 @@ sections[i].name=this.value;
 // Mise à jour de la valeur
 div.querySelector('.section-value').addEventListener('input',function(){
 sections[i].value=this.value;
+});
+// Mise à jour de la photo
+div.querySelector('.section-photo').addEventListener('input',function(){
+sections[i].photo=this.value;
+const preview=div.querySelector('.section-photo-preview');
+if(this.value.trim()){
+preview.innerHTML=`<img src="${this.value}" onerror="this.style.display='none'">`;
+}else{
+preview.innerHTML='';
+}
+});
+// Mise à jour de la description photo
+div.querySelector('.section-photo-desc').addEventListener('input',function(){
+sections[i].photoDesc=this.value;
 });
 c.appendChild(div);
 });
@@ -691,7 +730,9 @@ if(s.name&&s.name.trim()){
 finalSections.push({
 name:s.name.trim(),
 value:s.value?s.value.trim():'',
-color:s.color||'#a78bfa'
+color:s.color||'#a78bfa',
+photo:s.photo?s.photo.trim():'',
+photoDesc:s.photoDesc?s.photoDesc.trim():''
 });
 }
 });
