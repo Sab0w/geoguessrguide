@@ -441,7 +441,13 @@ return `rgba(${r},${g},${b},${alpha})`;
 
 function init(){
 if(!window.supabase){setTimeout(init,100);return;}
-supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
+auth:{
+persistSession:true,
+storageKey:'geoguessr-auth',
+storage:window.localStorage
+}
+});
 setupAuthEvents();
 checkAuth();
 }
