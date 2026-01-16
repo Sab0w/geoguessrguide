@@ -9,6 +9,28 @@
 :root{--bg:#1a1a1a;--card:#2d2d2d;--text:#fff;--accent:#4285F4;--del:#f55}
 *{box-sizing:border-box}
 body{background:var(--bg);font-family:'Segoe UI',sans-serif;color:var(--text);margin:0;padding:40px;overflow-x:hidden}
+
+/* Login styles */
+.login-container{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 80px)}
+.login-box{background:var(--card);padding:40px;border-radius:16px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1)}
+.login-box h1{text-align:center;margin:0 0 10px;font-weight:300}
+.login-box p{text-align:center;color:#888;margin:0 0 30px}
+.login-box label{display:block;margin-bottom:5px;font-weight:500;color:#ccc}
+.login-box input{width:100%;padding:12px;background:#1a1a1a;border:1px solid #444;color:#fff;border-radius:8px;font-size:1rem;margin-bottom:20px}
+.login-box input:focus{outline:none;border-color:var(--accent)}
+.login-btn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .3s}
+.login-btn:hover{background:#3367d6}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-error{background:rgba(255,85,85,.1);border:1px solid var(--del);color:var(--del);padding:12px;border-radius:8px;margin-bottom:20px;text-align:center;display:none}
+.login-tabs{display:flex;margin-bottom:25px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.1)}
+.login-tab{flex:1;padding:12px;background:transparent;border:none;color:#888;cursor:pointer;font-weight:600;transition:all .3s}
+.login-tab.active{background:var(--accent);color:#fff}
+.login-tab:hover:not(.active){background:rgba(255,255,255,.05)}
+.user-bar{display:flex;align-items:center;justify-content:flex-end;gap:15px;margin-bottom:20px;max-width:1200px;margin-left:auto;margin-right:auto}
+.user-info{display:flex;align-items:center;gap:10px;color:#888;font-size:.9rem}
+.user-email{color:var(--accent)}
+.logout-btn{background:rgba(255,85,85,.1);color:var(--del);border:1px solid var(--del);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s}
+.logout-btn:hover{background:var(--del);color:#fff}
 .header{max-width:1200px;margin:0 auto 30px;display:flex;align-items:center;justify-content:center;gap:20px}
 .title-wrapper{display:flex;align-items:center;justify-content:center;gap:15px}
 h1{font-weight:300;margin:0}
@@ -148,6 +170,36 @@ textarea{resize:vertical;min-height:80px}
 </style>
 </head>
 <body>
+
+<!-- Écran de connexion -->
+<div id="loginView" class="login-container">
+<div class="login-box">
+<h1>🌍 GeoGuessr</h1>
+<p>Connectez-vous pour accéder à votre base</p>
+<div class="login-tabs">
+<button class="login-tab active" id="tabLogin">Connexion</button>
+<button class="login-tab" id="tabRegister">Inscription</button>
+</div>
+<div class="login-error" id="loginError"></div>
+<form id="loginForm">
+<label>Email</label>
+<input type="email" id="loginEmail" placeholder="votre@email.com" required>
+<label>Mot de passe</label>
+<input type="password" id="loginPassword" placeholder="••••••••" required>
+<button type="submit" class="login-btn" id="loginBtn">Se connecter</button>
+</form>
+</div>
+</div>
+
+<!-- Application principale (cachée par défaut) -->
+<div id="appView" style="display:none">
+<div class="user-bar">
+<div class="user-info">
+<span>Connecté en tant que</span>
+<span class="user-email" id="userEmail"></span>
+</div>
+<button class="logout-btn" id="logoutBtn">Déconnexion</button>
+</div>
 <div class="main-view" id="mainView">
 <div class="header">
 <div class="title-wrapper">
@@ -285,6 +337,8 @@ textarea{resize:vertical;min-height:80px}
 </div>
 </div>
 
+</div><!-- Fin appView -->
+
 <script>
 (function(){
 const SUPABASE_URL='https://iawoksstpmtppadktnmi.supabase.co';
@@ -292,6 +346,8 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 let CONTINENT='europe';
 let supabase,sections=[],currentCountry=null,editSubcatIdx=null,photos=[];
 let customContinents=[];
+let currentUser=null;
+let isLoginMode=true;
 
 // Couleurs prédéfinies pour les catégories
 const colorPresets=[
@@ -326,6 +382,110 @@ return `rgba(${r},${g},${b},${alpha})`;
 function init(){
 if(!window.supabase){setTimeout(init,100);return;}
 supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+setupAuthEvents();
+checkAuth();
+}
+
+function setupAuthEvents(){
+// Tabs login/register
+document.getElementById('tabLogin').onclick=function(){
+isLoginMode=true;
+this.classList.add('active');
+document.getElementById('tabRegister').classList.remove('active');
+document.getElementById('loginBtn').textContent='Se connecter';
+};
+document.getElementById('tabRegister').onclick=function(){
+isLoginMode=false;
+this.classList.add('active');
+document.getElementById('tabLogin').classList.remove('active');
+document.getElementById('loginBtn').textContent="S'inscrire";
+};
+
+// Form submit
+document.getElementById('loginForm').onsubmit=async function(e){
+e.preventDefault();
+const email=document.getElementById('loginEmail').value.trim();
+const password=document.getElementById('loginPassword').value;
+const btn=document.getElementById('loginBtn');
+const errorDiv=document.getElementById('loginError');
+
+btn.disabled=true;
+btn.textContent=isLoginMode?'Connexion...':'Inscription...';
+errorDiv.style.display='none';
+
+try{
+let result;
+if(isLoginMode){
+result=await supabase.auth.signInWithPassword({email,password});
+}else{
+result=await supabase.auth.signUp({email,password});
+if(result.data?.user&&!result.error){
+errorDiv.style.display='block';
+errorDiv.style.background='rgba(46,204,113,.1)';
+errorDiv.style.borderColor='#2ecc71';
+errorDiv.style.color='#2ecc71';
+errorDiv.textContent='Inscription réussie ! Vérifiez votre email pour confirmer votre compte.';
+btn.disabled=false;
+btn.textContent="S'inscrire";
+return;
+}
+}
+if(result.error)throw result.error;
+}catch(err){
+errorDiv.style.display='block';
+errorDiv.style.background='rgba(255,85,85,.1)';
+errorDiv.style.borderColor='var(--del)';
+errorDiv.style.color='var(--del)';
+errorDiv.textContent=err.message==='Invalid login credentials'?'Email ou mot de passe incorrect':err.message;
+btn.disabled=false;
+btn.textContent=isLoginMode?'Se connecter':"S'inscrire";
+}
+};
+
+// Logout
+document.getElementById('logoutBtn').onclick=async function(){
+await supabase.auth.signOut();
+showLogin();
+};
+
+// Écouter les changements d'état d'auth
+supabase.auth.onAuthStateChange((event,session)=>{
+if(event==='SIGNED_IN'&&session){
+currentUser=session.user;
+showApp();
+}else if(event==='SIGNED_OUT'){
+currentUser=null;
+showLogin();
+}
+});
+}
+
+async function checkAuth(){
+const {data:{session}}=await supabase.auth.getSession();
+if(session){
+currentUser=session.user;
+showApp();
+}else{
+showLogin();
+}
+}
+
+function showLogin(){
+document.getElementById('loginView').style.display='flex';
+document.getElementById('appView').style.display='none';
+document.getElementById('loginEmail').value='';
+document.getElementById('loginPassword').value='';
+document.getElementById('loginError').style.display='none';
+}
+
+function showApp(){
+document.getElementById('loginView').style.display='none';
+document.getElementById('appView').style.display='block';
+document.getElementById('userEmail').textContent=currentUser?.email||'';
+initApp();
+}
+
+function initApp(){
 loadCustomContinents().then(()=>{
 renderCustomContinents();
 loadCountries();
