@@ -569,17 +569,21 @@ document.getElementById('adminPanel').classList.toggle('collapsed');
 };
 
 // Écouter les changements d'état d'auth
+let isLoggingIn=false;
 supabase.auth.onAuthStateChange(async(event,session)=>{
-if(event==='SIGNED_IN'&&session){
+console.log('Auth event:', event, session?.user?.email);
+if(event==='SIGNED_IN'&&session&&!isLoggingIn){
+isLoggingIn=true;
 currentUser=session.user;
 await loadUserRole();
 showApp();
+isLoggingIn=false;
 }else if(event==='SIGNED_OUT'){
 currentUser=null;
 userRole='viewer';
+isLoggingIn=false;
 showLogin();
 }else if(event==='PASSWORD_RECOVERY'){
-// Mode récupération de mot de passe
 showPasswordReset();
 }
 });
@@ -589,29 +593,32 @@ async function loadUserRole(){
 if(!currentUser)return;
 try{
 console.log('Chargement du rôle pour:', currentUser.id);
-const {data,error}=await supabase.from('user_roles').select('role').eq('user_id',currentUser.id).maybeSingle();
+
+// Timeout de 5 secondes max
+const timeoutPromise = new Promise((_, reject) => 
+  setTimeout(() => reject(new Error('Timeout')), 5000)
+);
+
+const queryPromise = supabase.from('user_roles').select('role').eq('user_id', currentUser.id).maybeSingle();
+
+const {data, error} = await Promise.race([queryPromise, timeoutPromise]);
+
 console.log('Résultat rôle:', data, error);
 if(error){
 console.error('Erreur lecture rôle:', error);
-userRole='admin'; // Par défaut admin pour débloquer
+userRole='admin';
 return;
 }
 if(data){
 userRole=data.role;
+console.log('Rôle assigné:', userRole);
 }else{
-// Aucun rôle trouvé, créer un rôle par défaut
-console.log('Création du rôle par défaut...');
-const {error:insertError}=await supabase.from('user_roles').insert([{
-user_id:currentUser.id,
-email:currentUser.email,
-role:'admin'
-}]);
-console.log('Résultat insertion:', insertError);
+console.log('Aucun rôle trouvé, assignation admin par défaut');
 userRole='admin';
 }
 }catch(e){
-console.error('Erreur chargement rôle:',e);
-userRole='admin'; // Par défaut admin pour débloquer
+console.error('Erreur/Timeout chargement rôle:',e);
+userRole='admin';
 }
 }
 
