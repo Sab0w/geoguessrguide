@@ -286,7 +286,7 @@ const SUPABASE_URL='https://iawoksstpmtppadktnmi.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhd29rc3N0cG10cHBhZGt0bm1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzUwOTAsImV4cCI6MjA4NDAxMTA5MH0.vl2Grce9qtU97lDKILYJughIfFpzY1TV-ELdmJkDaKg';
 let CONTINENT='europe';
 let supabase,sections=[],currentCountry=null,editSubcatIdx=null,photos=[];
-let customContinents=JSON.parse(localStorage.getItem('customContinents')||'[]');
+let customContinents=[];
 
 // Couleurs prédéfinies pour les catégories
 const colorPresets=[
@@ -321,10 +321,23 @@ return `rgba(${r},${g},${b},${alpha})`;
 function init(){
 if(!window.supabase){setTimeout(init,100);return;}
 supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+loadCustomContinents().then(()=>{
 renderCustomContinents();
 loadCountries();
+});
 setupEvents();
 setupLightbox();
+}
+
+async function loadCustomContinents(){
+try{
+const {data,error}=await supabase.from('custom_continents').select('*').order('name',{ascending:true});
+if(error)throw error;
+customContinents=data||[];
+}catch(e){
+console.error('Erreur chargement catégories:',e);
+customContinents=[];
+}
 }
 
 function setupLightbox(){
@@ -967,7 +980,7 @@ function closeContinentModal(){
 document.getElementById('continentModal').classList.remove('show');
 }
 
-function saveContinent(){
+async function saveContinent(){
 const name=document.getElementById('inputContinentName').value.trim();
 if(!name){alert('Le nom est obligatoire');return;}
 const isImageMode=document.getElementById('logoTypeImage').classList.contains('active');
@@ -983,20 +996,32 @@ newContinent.logo=logo;
 }else{
 newContinent.emoji=emoji;
 }
+try{
+const {error}=await supabase.from('custom_continents').insert([newContinent]);
+if(error)throw error;
 customContinents.push(newContinent);
-localStorage.setItem('customContinents',JSON.stringify(customContinents));
 renderCustomContinents();
 closeContinentModal();
 switchContinent(id);
+}catch(e){
+console.error(e);
+alert('Erreur lors de la sauvegarde: '+e.message);
+}
 }
 
-function deleteContinent(id){
+async function deleteContinent(id){
 if(!confirm('Supprimer cette catégorie ?'))return;
+try{
+const {error}=await supabase.from('custom_continents').delete().eq('id',id);
+if(error)throw error;
 customContinents=customContinents.filter(c=>c.id!==id);
-localStorage.setItem('customContinents',JSON.stringify(customContinents));
 renderCustomContinents();
 if(CONTINENT===id){
 switchContinent('europe');
+}
+}catch(e){
+console.error(e);
+alert('Erreur lors de la suppression: '+e.message);
 }
 }
 
