@@ -50,10 +50,12 @@ textarea{resize:vertical;min-height:80px}
 .section-row .field-color{flex:0 0 auto}
 .section-photo-preview{margin-top:10px}
 .section-photo-preview img{max-width:100%;max-height:150px;border-radius:8px;border:1px solid rgba(255,255,255,.2)}
-.subcat-section{background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);border-radius:12px;padding:20px;margin-bottom:20px;cursor:grab;transition:all .2s}
+.subcat-section{background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);border-radius:12px;padding:20px;margin-bottom:20px;cursor:grab;transition:all .2s;position:relative}
 .subcat-section:active{cursor:grabbing}
-.subcat-section.dragging{opacity:0.5;transform:scale(1.02);box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.subcat-section.drag-over{border:2px dashed var(--accent);background:rgba(66,133,244,.2)}
+.subcat-section.dragging{opacity:0.4;transform:scale(0.98);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.drag-indicator{height:4px;background:var(--accent);border-radius:2px;margin:10px 0;transition:all .2s;box-shadow:0 0 10px var(--accent)}
+.drag-ghost{position:fixed;pointer-events:none;z-index:1000;opacity:0.9;transform:rotate(2deg);box-shadow:0 12px 40px rgba(0,0,0,.5);background:rgba(66,133,244,.2);border:2px solid var(--accent);border-radius:12px;padding:15px 20px;color:#fff;font-weight:600;max-width:300px}
+#subcatContainer{min-height:50px}
 .subcat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
 .subcat-name{font-size:1.2rem;font-weight:600;color:var(--accent)}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:15px;margin-top:15px}
@@ -629,44 +631,108 @@ page.classList.add('active');
 function setupSubcatDragDrop(){
 const container=document.getElementById('subcatContainer');
 if(!container)return;
-const subcats=container.querySelectorAll('.subcat-section');
+
 let draggedItem=null;
 let draggedIndex=null;
+let indicator=null;
+let ghost=null;
 
-subcats.forEach(subcat=>{
-subcat.addEventListener('dragstart',function(e){
-draggedItem=this;
-draggedIndex=parseInt(this.dataset.index);
-this.classList.add('dragging');
+// Créer l'indicateur de position
+indicator=document.createElement('div');
+indicator.className='drag-indicator';
+indicator.style.display='none';
+
+container.addEventListener('dragstart',function(e){
+if(!e.target.classList.contains('subcat-section'))return;
+draggedItem=e.target;
+draggedIndex=parseInt(e.target.dataset.index);
+draggedItem.classList.add('dragging');
+
+// Créer le ghost personnalisé
+ghost=document.createElement('div');
+ghost.className='drag-ghost';
+ghost.textContent=currentCountry.subcategories[draggedIndex].name;
+document.body.appendChild(ghost);
+
+// Cacher le ghost par défaut du navigateur
+const emptyImg=new Image();
+emptyImg.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+e.dataTransfer.setDragImage(emptyImg,0,0);
 e.dataTransfer.effectAllowed='move';
 });
 
-subcat.addEventListener('dragend',function(){
-this.classList.remove('dragging');
-subcats.forEach(s=>s.classList.remove('drag-over'));
-draggedItem=null;
-draggedIndex=null;
-});
-
-subcat.addEventListener('dragover',function(e){
-e.preventDefault();
-e.dataTransfer.dropEffect='move';
-if(this!==draggedItem){
-this.classList.add('drag-over');
+document.addEventListener('drag',function(e){
+if(ghost&&e.clientX&&e.clientY){
+ghost.style.left=(e.clientX+15)+'px';
+ghost.style.top=(e.clientY+15)+'px';
 }
 });
 
-subcat.addEventListener('dragleave',function(){
-this.classList.remove('drag-over');
+container.addEventListener('dragover',function(e){
+e.preventDefault();
+e.dataTransfer.dropEffect='move';
+if(!draggedItem)return;
+
+const afterElement=getDragAfterElement(container,e.clientY);
+
+// Retirer l'indicateur de sa position actuelle
+if(indicator.parentNode){
+indicator.parentNode.removeChild(indicator);
+}
+
+indicator.style.display='block';
+
+if(afterElement==null){
+container.appendChild(indicator);
+}else{
+container.insertBefore(indicator,afterElement);
+}
 });
 
-subcat.addEventListener('drop',async function(e){
-e.preventDefault();
-this.classList.remove('drag-over');
-if(this===draggedItem)return;
+container.addEventListener('dragleave',function(e){
+if(e.target===container&&!container.contains(e.relatedTarget)){
+indicator.style.display='none';
+}
+});
 
-const targetIndex=parseInt(this.dataset.index);
-if(draggedIndex===null||targetIndex===null)return;
+container.addEventListener('dragend',function(){
+if(draggedItem){
+draggedItem.classList.remove('dragging');
+}
+if(indicator&&indicator.parentNode){
+indicator.parentNode.removeChild(indicator);
+}
+if(ghost&&ghost.parentNode){
+ghost.parentNode.removeChild(ghost);
+}
+draggedItem=null;
+draggedIndex=null;
+ghost=null;
+});
+
+container.addEventListener('drop',async function(e){
+e.preventDefault();
+if(!draggedItem||draggedIndex===null)return;
+
+const afterElement=getDragAfterElement(container,e.clientY);
+let targetIndex;
+
+if(afterElement==null){
+targetIndex=currentCountry.subcategories.length-1;
+}else{
+targetIndex=parseInt(afterElement.dataset.index);
+if(targetIndex>draggedIndex)targetIndex--;
+}
+
+if(targetIndex===draggedIndex){
+// Nettoyer
+if(indicator&&indicator.parentNode)indicator.parentNode.removeChild(indicator);
+if(ghost&&ghost.parentNode)ghost.parentNode.removeChild(ghost);
+draggedItem.classList.remove('dragging');
+draggedItem=null;
+draggedIndex=null;
+return;
+}
 
 // Réorganiser le tableau
 const newSubcats=[...currentCountry.subcategories];
@@ -684,7 +750,20 @@ console.error(err);
 alert('Erreur lors de la réorganisation');
 }
 });
-});
+
+function getDragAfterElement(container,y){
+const draggableElements=[...container.querySelectorAll('.subcat-section:not(.dragging)')];
+
+return draggableElements.reduce((closest,child)=>{
+const box=child.getBoundingClientRect();
+const offset=y-box.top-box.height/2;
+if(offset<0&&offset>closest.offset){
+return {offset:offset,element:child};
+}else{
+return closest;
+}
+},{offset:Number.NEGATIVE_INFINITY}).element;
+}
 }
 
 function closeDetailPage(){
