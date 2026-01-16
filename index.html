@@ -725,9 +725,12 @@ alert('Erreur: '+e.message);
 }
 
 async function checkAuth(){
+console.log('Vérification de la session...');
 const {data:{session}}=await supabase.auth.getSession();
+console.log('Session:', session?.user?.email);
 if(session){
 currentUser=session.user;
+await loadUserRole();
 showApp();
 }else{
 showLogin();
