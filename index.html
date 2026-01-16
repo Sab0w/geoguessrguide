@@ -50,7 +50,10 @@ textarea{resize:vertical;min-height:80px}
 .section-row .field-color{flex:0 0 auto}
 .section-photo-preview{margin-top:10px}
 .section-photo-preview img{max-width:100%;max-height:150px;border-radius:8px;border:1px solid rgba(255,255,255,.2)}
-.subcat-section{background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);border-radius:12px;padding:20px;margin-bottom:20px}
+.subcat-section{background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);border-radius:12px;padding:20px;margin-bottom:20px;cursor:grab;transition:all .2s}
+.subcat-section:active{cursor:grabbing}
+.subcat-section.dragging{opacity:0.5;transform:scale(1.02);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.subcat-section.drag-over{border:2px dashed var(--accent);background:rgba(66,133,244,.2)}
 .subcat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
 .subcat-name{font-size:1.2rem;font-weight:600;color:var(--accent)}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:15px;margin-top:15px}
@@ -550,11 +553,12 @@ h+=`</div>`;
 }
 
 if(c.subcategories&&c.subcategories.length){
-h+=`<h2 class="section-title">Sous-catégories (${c.subcategories.length})</h2>`;
+h+=`<h2 class="section-title">Sous-catégories (${c.subcategories.length})</h2>
+<div id="subcatContainer">`;
 c.subcategories.forEach((s,i)=>{
-h+=`<div class="subcat-section">
+h+=`<div class="subcat-section" draggable="true" data-index="${i}">
 <div class="subcat-header">
-<div class="subcat-name">${s.name}</div>
+<div class="subcat-name">⋮⋮ ${s.name}</div>
 <div style="display:flex;gap:8px">
 <button class="edit-inline-btn edit-subcat-btn" data-index="${i}">✏️ Modifier</button>
 <button class="btn btn-secondary del-subcat-btn" data-index="${i}" style="padding:8px 12px;font-size:.85rem;background:var(--del)">🗑️ Supprimer</button>
@@ -575,6 +579,7 @@ h+=`<div style="color:#888;padding:10px">Aucune photo</div>`;
 }
 h+=`</div>`;
 });
+h+=`</div>`;
 }else{
 h+=`<div style="text-align:center;padding:60px;color:#888">
 <p style="font-size:1.2rem;margin-bottom:20px">Aucune sous-catégorie pour le moment</p>
@@ -615,8 +620,71 @@ const title=this.dataset.title;
 openLightbox(url,title);
 };
 });
+// Drag & Drop pour réorganiser les sous-catégories
+setupSubcatDragDrop();
 document.getElementById('mainView').classList.add('hidden');
 page.classList.add('active');
+}
+
+function setupSubcatDragDrop(){
+const container=document.getElementById('subcatContainer');
+if(!container)return;
+const subcats=container.querySelectorAll('.subcat-section');
+let draggedItem=null;
+let draggedIndex=null;
+
+subcats.forEach(subcat=>{
+subcat.addEventListener('dragstart',function(e){
+draggedItem=this;
+draggedIndex=parseInt(this.dataset.index);
+this.classList.add('dragging');
+e.dataTransfer.effectAllowed='move';
+});
+
+subcat.addEventListener('dragend',function(){
+this.classList.remove('dragging');
+subcats.forEach(s=>s.classList.remove('drag-over'));
+draggedItem=null;
+draggedIndex=null;
+});
+
+subcat.addEventListener('dragover',function(e){
+e.preventDefault();
+e.dataTransfer.dropEffect='move';
+if(this!==draggedItem){
+this.classList.add('drag-over');
+}
+});
+
+subcat.addEventListener('dragleave',function(){
+this.classList.remove('drag-over');
+});
+
+subcat.addEventListener('drop',async function(e){
+e.preventDefault();
+this.classList.remove('drag-over');
+if(this===draggedItem)return;
+
+const targetIndex=parseInt(this.dataset.index);
+if(draggedIndex===null||targetIndex===null)return;
+
+// Réorganiser le tableau
+const newSubcats=[...currentCountry.subcategories];
+const [moved]=newSubcats.splice(draggedIndex,1);
+newSubcats.splice(targetIndex,0,moved);
+
+// Sauvegarder dans Supabase
+try{
+const {error}=await supabase.from('countries').update({subcategories:newSubcats}).eq('id',currentCountry.id);
+if(error)throw error;
+currentCountry.subcategories=newSubcats;
+showDetail(currentCountry);
+}catch(err){
+console.error(err);
+alert('Erreur lors de la réorganisation');
+}
+});
+});
 }
 
 function closeDetailPage(){
