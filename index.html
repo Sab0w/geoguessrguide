@@ -31,6 +31,36 @@ body{background:var(--bg);font-family:'Segoe UI',sans-serif;color:var(--text);ma
 .user-email{color:var(--accent)}
 .logout-btn{background:rgba(255,85,85,.1);color:var(--del);border:1px solid var(--del);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s}
 .logout-btn:hover{background:var(--del);color:#fff}
+.login-footer{text-align:center;margin-top:20px}
+.forgot-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:.9rem;text-decoration:underline}
+.forgot-btn:hover{color:#fff}
+.back-to-login{background:none;border:none;color:#888;cursor:pointer;font-size:.85rem;margin-top:15px;display:block;width:100%;text-align:center}
+.back-to-login:hover{color:#fff}
+
+/* Admin Panel */
+.admin-btn{background:rgba(139,92,246,.2);color:#a78bfa;border:1px solid #a78bfa;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .3s}
+.admin-btn:hover{background:#a78bfa;color:#fff}
+.admin-panel{background:var(--card);border-radius:12px;padding:25px;margin-bottom:30px;border:1px solid rgba(139,92,246,.3);max-width:1200px;margin-left:auto;margin-right:auto}
+.admin-panel h3{margin:0 0 20px;color:#a78bfa;display:flex;align-items:center;gap:10px}
+.admin-panel h3 span{font-size:1.5rem}
+.users-table{width:100%;border-collapse:collapse}
+.users-table th,.users-table td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.1)}
+.users-table th{color:#888;font-weight:600;text-transform:uppercase;font-size:.8rem}
+.users-table tr:hover{background:rgba(255,255,255,.02)}
+.role-badge{padding:4px 10px;border-radius:12px;font-size:.75rem;font-weight:600;text-transform:uppercase}
+.role-admin{background:rgba(139,92,246,.2);color:#a78bfa}
+.role-editor{background:rgba(66,133,244,.2);color:var(--accent)}
+.role-viewer{background:rgba(255,255,255,.1);color:#888}
+.role-select{background:#1a1a1a;border:1px solid #444;color:#fff;padding:6px 10px;border-radius:6px;font-size:.85rem}
+.btn-small{padding:6px 12px;font-size:.8rem;border-radius:4px;cursor:pointer;border:none;transition:all .3s}
+.btn-danger{background:rgba(255,85,85,.2);color:var(--del)}
+.btn-danger:hover{background:var(--del);color:#fff}
+.admin-toggle{display:none}
+.admin-panel.collapsed .admin-content{display:none}
+.admin-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.admin-header h3{margin:0}
+.toggle-icon{font-size:1.2rem;transition:transform .3s}
+.admin-panel.collapsed .toggle-icon{transform:rotate(-90deg)}
 .header{max-width:1200px;margin:0 auto 30px;display:flex;align-items:center;justify-content:center;gap:20px}
 .title-wrapper{display:flex;align-items:center;justify-content:center;gap:15px}
 h1{font-weight:300;margin:0}
@@ -184,10 +214,15 @@ textarea{resize:vertical;min-height:80px}
 <form id="loginForm">
 <label>Email</label>
 <input type="email" id="loginEmail" placeholder="votre@email.com" required>
+<div id="passwordField">
 <label>Mot de passe</label>
 <input type="password" id="loginPassword" placeholder="••••••••" required>
+</div>
 <button type="submit" class="login-btn" id="loginBtn">Se connecter</button>
 </form>
+<div class="login-footer">
+<button type="button" class="forgot-btn" id="forgotBtn">Mot de passe oublié ?</button>
+</div>
 </div>
 </div>
 
@@ -197,8 +232,31 @@ textarea{resize:vertical;min-height:80px}
 <div class="user-info">
 <span>Connecté en tant que</span>
 <span class="user-email" id="userEmail"></span>
+<span class="role-badge" id="userRole"></span>
 </div>
+<button class="admin-btn" id="adminBtn" style="display:none">👥 Gérer les utilisateurs</button>
 <button class="logout-btn" id="logoutBtn">Déconnexion</button>
+</div>
+
+<div class="admin-panel" id="adminPanel" style="display:none">
+<div class="admin-header" id="adminHeader">
+<h3><span>👥</span> Gestion des utilisateurs</h3>
+<span class="toggle-icon">▼</span>
+</div>
+<div class="admin-content">
+<table class="users-table">
+<thead>
+<tr>
+<th>Email</th>
+<th>Rôle</th>
+<th>Inscrit le</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="usersTableBody">
+</tbody>
+</table>
+</div>
 </div>
 <div class="main-view" id="mainView">
 <div class="header">
@@ -348,6 +406,8 @@ let supabase,sections=[],currentCountry=null,editSubcatIdx=null,photos=[];
 let customContinents=[];
 let currentUser=null;
 let isLoginMode=true;
+let isResetMode=false;
+let userRole='viewer';
 
 // Couleurs prédéfinies pour les catégories
 const colorPresets=[
@@ -390,15 +450,36 @@ function setupAuthEvents(){
 // Tabs login/register
 document.getElementById('tabLogin').onclick=function(){
 isLoginMode=true;
+isResetMode=false;
 this.classList.add('active');
 document.getElementById('tabRegister').classList.remove('active');
 document.getElementById('loginBtn').textContent='Se connecter';
+document.getElementById('passwordField').style.display='block';
+document.getElementById('loginPassword').required=true;
+document.getElementById('forgotBtn').style.display='inline';
 };
 document.getElementById('tabRegister').onclick=function(){
 isLoginMode=false;
+isResetMode=false;
 this.classList.add('active');
 document.getElementById('tabLogin').classList.remove('active');
 document.getElementById('loginBtn').textContent="S'inscrire";
+document.getElementById('passwordField').style.display='block';
+document.getElementById('loginPassword').required=true;
+document.getElementById('forgotBtn').style.display='inline';
+};
+
+// Mot de passe oublié
+document.getElementById('forgotBtn').onclick=function(){
+isResetMode=true;
+isLoginMode=false;
+document.getElementById('tabLogin').classList.remove('active');
+document.getElementById('tabRegister').classList.remove('active');
+document.getElementById('loginBtn').textContent='Envoyer le lien';
+document.getElementById('passwordField').style.display='none';
+document.getElementById('loginPassword').required=false;
+this.style.display='none';
+document.getElementById('loginError').style.display='none';
 };
 
 // Form submit
@@ -410,16 +491,37 @@ const btn=document.getElementById('loginBtn');
 const errorDiv=document.getElementById('loginError');
 
 btn.disabled=true;
-btn.textContent=isLoginMode?'Connexion...':'Inscription...';
 errorDiv.style.display='none';
 
 try{
 let result;
-if(isLoginMode){
+if(isResetMode){
+btn.textContent='Envoi en cours...';
+const {error}=await supabase.auth.resetPasswordForEmail(email,{
+redirectTo:window.location.origin+window.location.pathname
+});
+if(error)throw error;
+errorDiv.style.display='block';
+errorDiv.style.background='rgba(46,204,113,.1)';
+errorDiv.style.borderColor='#2ecc71';
+errorDiv.style.color='#2ecc71';
+errorDiv.textContent='Email envoyé ! Vérifiez votre boîte mail pour réinitialiser votre mot de passe.';
+btn.disabled=false;
+btn.textContent='Envoyer le lien';
+return;
+}else if(isLoginMode){
+btn.textContent='Connexion...';
 result=await supabase.auth.signInWithPassword({email,password});
 }else{
+btn.textContent='Inscription...';
 result=await supabase.auth.signUp({email,password});
 if(result.data?.user&&!result.error){
+// Créer le profil utilisateur avec rôle par défaut
+await supabase.from('user_roles').insert([{
+user_id:result.data.user.id,
+email:email,
+role:'viewer'
+}]);
 errorDiv.style.display='block';
 errorDiv.style.background='rgba(46,204,113,.1)';
 errorDiv.style.borderColor='#2ecc71';
@@ -436,9 +538,12 @@ errorDiv.style.display='block';
 errorDiv.style.background='rgba(255,85,85,.1)';
 errorDiv.style.borderColor='var(--del)';
 errorDiv.style.color='var(--del)';
-errorDiv.textContent=err.message==='Invalid login credentials'?'Email ou mot de passe incorrect':err.message;
+let msg=err.message;
+if(msg==='Invalid login credentials')msg='Email ou mot de passe incorrect';
+if(msg.includes('Email not confirmed'))msg='Veuillez confirmer votre email avant de vous connecter';
+errorDiv.textContent=msg;
 btn.disabled=false;
-btn.textContent=isLoginMode?'Se connecter':"S'inscrire";
+btn.textContent=isResetMode?'Envoyer le lien':(isLoginMode?'Se connecter':"S'inscrire");
 }
 };
 
@@ -448,16 +553,159 @@ await supabase.auth.signOut();
 showLogin();
 };
 
+// Admin panel toggle
+document.getElementById('adminBtn').onclick=function(){
+const panel=document.getElementById('adminPanel');
+if(panel.style.display==='none'){
+panel.style.display='block';
+loadUsers();
+}else{
+panel.style.display='none';
+}
+};
+
+document.getElementById('adminHeader').onclick=function(){
+document.getElementById('adminPanel').classList.toggle('collapsed');
+};
+
 // Écouter les changements d'état d'auth
-supabase.auth.onAuthStateChange((event,session)=>{
+supabase.auth.onAuthStateChange(async(event,session)=>{
 if(event==='SIGNED_IN'&&session){
 currentUser=session.user;
+await loadUserRole();
 showApp();
 }else if(event==='SIGNED_OUT'){
 currentUser=null;
+userRole='viewer';
 showLogin();
+}else if(event==='PASSWORD_RECOVERY'){
+// Mode récupération de mot de passe
+showPasswordReset();
 }
 });
+}
+
+async function loadUserRole(){
+if(!currentUser)return;
+try{
+const {data,error}=await supabase.from('user_roles').select('role').eq('user_id',currentUser.id).single();
+if(data){
+userRole=data.role;
+}else{
+// Créer un rôle par défaut si n'existe pas
+await supabase.from('user_roles').insert([{
+user_id:currentUser.id,
+email:currentUser.email,
+role:'viewer'
+}]);
+userRole='viewer';
+}
+}catch(e){
+console.error('Erreur chargement rôle:',e);
+userRole='viewer';
+}
+}
+
+async function loadUsers(){
+if(userRole!=='admin')return;
+try{
+const {data,error}=await supabase.from('user_roles').select('*').order('created_at',{ascending:false});
+if(error)throw error;
+renderUsersTable(data||[]);
+}catch(e){
+console.error('Erreur chargement utilisateurs:',e);
+}
+}
+
+function renderUsersTable(users){
+const tbody=document.getElementById('usersTableBody');
+tbody.innerHTML='';
+users.forEach(u=>{
+const tr=document.createElement('tr');
+const isCurrentUser=u.user_id===currentUser.id;
+const roleClass=u.role==='admin'?'role-admin':(u.role==='editor'?'role-editor':'role-viewer');
+const date=new Date(u.created_at).toLocaleDateString('fr-FR');
+tr.innerHTML=`
+<td>${u.email}${isCurrentUser?' <span style="color:#888">(vous)</span>':''}</td>
+<td>
+<select class="role-select" data-userid="${u.user_id}" ${isCurrentUser?'disabled':''}>
+<option value="viewer" ${u.role==='viewer'?'selected':''}>Lecteur</option>
+<option value="editor" ${u.role==='editor'?'selected':''}>Éditeur</option>
+<option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+</select>
+</td>
+<td>${date}</td>
+<td>
+${!isCurrentUser?`<button class="btn-small btn-danger" data-userid="${u.user_id}">Supprimer</button>`:''}
+</td>`;
+tbody.appendChild(tr);
+});
+
+// Event listeners pour les selects
+tbody.querySelectorAll('.role-select').forEach(select=>{
+select.onchange=async function(){
+const userId=this.dataset.userid;
+const newRole=this.value;
+try{
+const {error}=await supabase.from('user_roles').update({role:newRole}).eq('user_id',userId);
+if(error)throw error;
+}catch(e){
+alert('Erreur: '+e.message);
+loadUsers();
+}
+};
+});
+
+// Event listeners pour supprimer
+tbody.querySelectorAll('.btn-danger').forEach(btn=>{
+btn.onclick=async function(){
+if(!confirm('Supprimer cet utilisateur ?'))return;
+const userId=this.dataset.userid;
+try{
+const {error}=await supabase.from('user_roles').delete().eq('user_id',userId);
+if(error)throw error;
+loadUsers();
+}catch(e){
+alert('Erreur: '+e.message);
+}
+};
+});
+}
+
+function showPasswordReset(){
+const modal=document.createElement('div');
+modal.className='modal show';
+modal.innerHTML=`
+<div class="modal-content" style="max-width:400px">
+<h2>Nouveau mot de passe</h2>
+<label>Nouveau mot de passe</label>
+<input type="password" id="newPassword" placeholder="••••••••" minlength="6">
+<label>Confirmer le mot de passe</label>
+<input type="password" id="confirmPassword" placeholder="••••••••">
+<button class="save-btn" id="saveNewPassword">Enregistrer</button>
+</div>`;
+document.body.appendChild(modal);
+
+document.getElementById('saveNewPassword').onclick=async function(){
+const newPass=document.getElementById('newPassword').value;
+const confirmPass=document.getElementById('confirmPassword').value;
+if(newPass!==confirmPass){
+alert('Les mots de passe ne correspondent pas');
+return;
+}
+if(newPass.length<6){
+alert('Le mot de passe doit contenir au moins 6 caractères');
+return;
+}
+try{
+const {error}=await supabase.auth.updateUser({password:newPass});
+if(error)throw error;
+alert('Mot de passe modifié avec succès !');
+modal.remove();
+}catch(e){
+alert('Erreur: '+e.message);
+}
+};
 }
 
 async function checkAuth(){
@@ -482,6 +730,16 @@ function showApp(){
 document.getElementById('loginView').style.display='none';
 document.getElementById('appView').style.display='block';
 document.getElementById('userEmail').textContent=currentUser?.email||'';
+
+// Afficher le rôle
+const roleEl=document.getElementById('userRole');
+roleEl.textContent=userRole==='admin'?'Admin':(userRole==='editor'?'Éditeur':'Lecteur');
+roleEl.className='role-badge '+(userRole==='admin'?'role-admin':(userRole==='editor'?'role-editor':'role-viewer'));
+
+// Afficher le bouton admin si admin
+document.getElementById('adminBtn').style.display=userRole==='admin'?'inline-block':'none';
+document.getElementById('adminPanel').style.display='none';
+
 initApp();
 }
 
