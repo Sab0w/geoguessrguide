@@ -201,8 +201,16 @@ textarea{resize:vertical;min-height:80px}
 </head>
 <body>
 
-<!-- Écran de connexion -->
-<div id="loginView" class="login-container">
+<!-- Écran de chargement -->
+<div id="loadingView" class="login-container">
+<div style="text-align:center">
+<h1 style="font-size:3rem;margin-bottom:20px">🌍</h1>
+<p style="color:#888">Chargement...</p>
+</div>
+</div>
+
+<!-- Écran de connexion (caché par défaut) -->
+<div id="loginView" class="login-container" style="display:none">
 <div class="login-box">
 <h1>🌍 GeoGuessr</h1>
 <p>Connectez-vous pour accéder à votre base</p>
@@ -744,6 +752,7 @@ showLogin();
 }
 
 function showLogin(){
+document.getElementById('loadingView').style.display='none';
 document.getElementById('loginView').style.display='flex';
 document.getElementById('appView').style.display='none';
 document.getElementById('loginEmail').value='';
@@ -752,6 +761,7 @@ document.getElementById('loginError').style.display='none';
 }
 
 function showApp(){
+document.getElementById('loadingView').style.display='none';
 document.getElementById('loginView').style.display='none';
 document.getElementById('appView').style.display='block';
 document.getElementById('userEmail').textContent=currentUser?.email||'';
